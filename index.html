@@ -137,7 +137,7 @@
 
         <!-- Input Modal -->
         <div id="modal" class="hidden fixed inset-0 bg-slate-900/60 z-[70] flex items-end sm:items-center justify-center p-4 backdrop-blur-sm">
-            <div class="bg-white w-full max-w-sm rounded-t-[3rem] sm:rounded-[3rem] p-8 animate-slide-up shadow-2xl relative">
+            <div class="bg-white w-full max-sm:rounded-t-[3rem] sm:rounded-[3rem] p-8 animate-slide-up shadow-2xl relative">
                 <div class="absolute top-4 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-slate-100 rounded-full sm:hidden"></div>
                 <div class="flex justify-between items-start mb-8 mt-2">
                     <div>
@@ -316,30 +316,58 @@
         // Firebase Sync
         function startSync() {
             if (!authUser) return;
-            // Public Rule 1
+            
+            // Public 데이터 동기화
             const pubRef = collection(db, 'artifacts', appId, 'public', 'data', 'records');
             unsubPublic = onSnapshot(pubRef, (snap) => {
                 allRecords = snap.docs.map(d => ({ ...d.data(), id: d.id }));
                 updateRankings();
-            }, e => console.error("Sync Pub Error", e));
+            }, e => console.error("Sync Public Error:", e));
 
+            // 로그인 사용자의 개인 데이터 동기화
             if (currentUser) {
-                // Private Rule 1
                 const privRef = collection(db, 'artifacts', appId, 'users', authUser.uid, 'records');
                 unsubPrivate = onSnapshot(privRef, (snap) => {
                     userData = {};
                     snap.docs.forEach(d => userData[d.id] = d.data());
-                    renderCalendar(); updateStats();
-                }, e => console.error("Sync Priv Error", e));
+                    renderCalendar(); 
+                    updateStats();
+                }, e => console.error("Sync Private Error:", e));
             }
         }
 
         // Initialization
         async function init() {
+            // 멤버 목록 셋업
             members.forEach(m => {
                 const o = document.createElement('option');
                 o.value = m; o.textContent = m;
                 els.userSelect.appendChild(o);
+            });
+
+            // 인증 상태 변화 감지 리스너 등록
+            onAuthStateChanged(auth, (user) => {
+                if (user) {
+                    authUser = user;
+                    // 로딩 숨기기
+                    els.loading.classList.add('hidden');
+                    
+                    const saved = localStorage.getItem('srt_d_name');
+                    if (saved && members.includes(saved)) {
+                        currentUser = saved;
+                        els.displayName.textContent = saved;
+                        els.loginScreen.classList.add('hidden');
+                        els.mainScreen.classList.remove('hidden');
+                        startSync();
+                    } else {
+                        els.loginScreen.classList.remove('hidden');
+                        els.mainScreen.classList.add('hidden');
+                        startSync();
+                    }
+                } else {
+                    // 사용자 정보가 없으면 익명 로그인 시도
+                    doAuth();
+                }
             });
 
             const doAuth = async () => {
@@ -350,33 +378,17 @@
                         await signInAnonymously(auth);
                     }
                 } catch (err) {
-                    console.error("Auth Failure", err);
-                    if (err.code === 'auth/configuration-not-found') {
+                    console.error("Auth Failure:", err);
+                    els.loading.classList.add('hidden');
+                    if (err.code === 'auth/configuration-not-found' || err.code === 'auth/operation-not-allowed') {
                         els.errorOverlay.classList.remove('hidden');
-                        els.errorText.innerHTML = "Firebase <b>익명 로그인</b>이 활성화되지 않았습니다.<br><small class='opacity-50'>Auth > Sign-in method에서 '익명'을 켜주세요.</small>";
+                        els.errorText.innerHTML = "Firebase <b>익명 로그인</b> 설정이 필요합니다.<br><small class='opacity-50 text-xs'>Authentication > Sign-in method에서 익명(Anonymous)을 활성화해주세요.</small>";
+                    } else {
+                        els.errorOverlay.classList.remove('hidden');
+                        els.errorText.textContent = "네트워크 오류가 발생했습니다. 잠시 후 다시 시도해주세요.";
                     }
                 }
             };
-
-            onAuthStateChanged(auth, (user) => {
-                if (user) {
-                    authUser = user;
-                    els.loading.classList.add('hidden');
-                    const saved = localStorage.getItem('srt_d_name');
-                    if (saved && members.includes(saved)) {
-                        currentUser = saved;
-                        els.displayName.textContent = saved;
-                        els.loginScreen.classList.add('hidden');
-                        els.mainScreen.classList.remove('hidden');
-                        startSync();
-                    } else {
-                        els.loginScreen.classList.remove('hidden');
-                        startSync();
-                    }
-                }
-            });
-
-            await doAuth();
         }
 
         // Event Handlers
@@ -416,16 +428,19 @@
             try {
                 els.btnSave.disabled = true;
                 els.btnSave.textContent = "저장 중...";
-                // Rule 1 Write
                 await setDoc(doc(db, 'artifacts', appId, 'users', authUser.uid, 'records', selectedDateStr), payload);
                 await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'records', `${currentUser}_${selectedDateStr}`), payload);
                 els.modal.classList.add('hidden');
-            } catch (e) { console.error(e); } finally {
+            } catch (e) { 
+                console.error("Save Error:", e);
+                alert("데이터 저장에 실패했습니다. Firebase 규칙을 확인해주세요.");
+            } finally {
                 els.btnSave.disabled = false;
                 els.btnSave.textContent = "데이터 저장";
             }
         };
 
+        // 앱 시작
         init();
     </script>
 </body>
