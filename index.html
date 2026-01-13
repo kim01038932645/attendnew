@@ -24,17 +24,7 @@
         <div id="loading" class="fixed inset-0 bg-white z-[60] flex items-center justify-center">
             <div class="flex flex-col items-center">
                 <div class="animate-spin rounded-full h-12 w-12 border-4 border-blue-600 border-t-transparent"></div>
-                <p class="mt-4 text-slate-500 font-bold tracking-tight">데이터 연결 확인 중...</p>
-            </div>
-        </div>
-
-        <!-- Error Message Overlay -->
-        <div id="error-overlay" class="hidden fixed inset-0 bg-slate-900/90 z-[100] flex items-center justify-center p-6 text-center backdrop-blur-sm">
-            <div class="bg-white p-8 rounded-[2rem] max-w-sm shadow-2xl">
-                <div class="text-red-500 text-6xl mb-4">⚙️</div>
-                <h3 class="text-2xl font-black mb-3 text-slate-800">연결 설정 필요</h3>
-                <p id="error-text" class="text-slate-600 text-sm mb-6 leading-relaxed">Firebase 인증 설정이 필요합니다.</p>
-                <button onclick="location.reload()" class="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold hover:bg-blue-700 active:scale-95 transition-all">설정 후 다시 시도</button>
+                <p class="mt-4 text-slate-500 font-bold tracking-tight">시스템 준비 중...</p>
             </div>
         </div>
 
@@ -60,7 +50,6 @@
                 </button>
             </div>
 
-            <!-- Rankings (Monthly Summary) -->
             <div class="w-full mt-10 bg-slate-50 p-6 rounded-[2rem] border border-slate-100">
                 <h2 class="text-sm font-black mb-5 flex items-center text-slate-800 uppercase tracking-wider">
                     <span class="mr-2">🔥</span> Monthly Leaders
@@ -196,16 +185,13 @@
         ].sort();
 
         // Application State
-        let currentUser = null;
+        let currentUser = localStorage.getItem('srt_d_name') || null;
         let authUser = null;
         let currentMonth = new Date(2026, 0, 1);
         let selectedDateStr = "";
         let userData = {}; 
         let allRecords = []; 
-        let unsubPrivate = null;
-        let unsubPublic = null;
 
-        // Elements Mapping
         const els = {
             loading: document.getElementById('loading'),
             loginScreen: document.getElementById('screen-login'),
@@ -222,15 +208,13 @@
             calendarBody: document.getElementById('calendar-body'),
             displayName: document.getElementById('display-name'),
             rankDist: document.getElementById('rank-distance'),
-            rankAttr: document.getElementById('rank-attendance'),
-            errorOverlay: document.getElementById('error-overlay'),
-            errorText: document.getElementById('error-text')
+            rankAttr: document.getElementById('rank-attendance')
         };
 
-        // Logic Functions
         function updateStats() {
             const y = currentMonth.getFullYear(), m = currentMonth.getMonth();
             let dSum = 0, aSum = 0;
+            // userData에서 현재 월의 합계 계산 (사용자별 필터링은 sync에서 처리)
             Object.keys(userData).forEach(ds => {
                 const dt = new Date(ds);
                 if (dt.getFullYear() === y && dt.getMonth() === m) {
@@ -313,30 +297,34 @@
             }
         }
 
-        // Firebase Sync
+        // Firebase Sync - 인증 없이 공용 데이터 활용
         function startSync() {
-            if (!authUser) return;
-            
-            // Public 데이터 동기화
+            // Public 데이터 동기화 (랭킹용)
             const pubRef = collection(db, 'artifacts', appId, 'public', 'data', 'records');
-            unsubPublic = onSnapshot(pubRef, (snap) => {
+            onSnapshot(pubRef, (snap) => {
                 allRecords = snap.docs.map(d => ({ ...d.data(), id: d.id }));
-                updateRankings();
-            }, e => console.error("Sync Public Error:", e));
-
-            // 로그인 사용자의 개인 데이터 동기화
-            if (currentUser) {
-                const privRef = collection(db, 'artifacts', appId, 'users', authUser.uid, 'records');
-                unsubPrivate = onSnapshot(privRef, (snap) => {
-                    userData = {};
-                    snap.docs.forEach(d => userData[d.id] = d.data());
+                
+                // 현재 로그인한 사용자의 데이터만 userData에 추출
+                if (currentUser) {
+                    const prefix = `${currentUser}_`;
+                    const newUserDate = {};
+                    allRecords.forEach(r => {
+                        if (r.id.startsWith(prefix)) {
+                            const dateKey = r.id.replace(prefix, "");
+                            newUserDate[dateKey] = r;
+                        }
+                    });
+                    userData = newUserDate;
                     renderCalendar(); 
                     updateStats();
-                }, e => console.error("Sync Private Error:", e));
-            }
+                }
+                updateRankings();
+            }, e => {
+                console.error("데이터 동기화 실패. Firebase 규칙(Rule)을 확인하세요:", e);
+                // 규칙 오류 시 로컬 데이터만이라도 렌더링하도록 유도 가능
+            });
         }
 
-        // Initialization
         async function init() {
             // 멤버 목록 셋업
             members.forEach(m => {
@@ -345,53 +333,40 @@
                 els.userSelect.appendChild(o);
             });
 
-            // 인증 상태 변화 감지 리스너 등록
-            onAuthStateChanged(auth, (user) => {
-                if (user) {
-                    authUser = user;
-                    // 로딩 숨기기
-                    els.loading.classList.add('hidden');
-                    
-                    const saved = localStorage.getItem('srt_d_name');
-                    if (saved && members.includes(saved)) {
-                        currentUser = saved;
-                        els.displayName.textContent = saved;
-                        els.loginScreen.classList.add('hidden');
-                        els.mainScreen.classList.remove('hidden');
-                        startSync();
-                    } else {
-                        els.loginScreen.classList.remove('hidden');
-                        els.mainScreen.classList.add('hidden');
-                        startSync();
-                    }
+            // 인증 무시하고 일단 화면 표시
+            if (currentUser && members.includes(currentUser)) {
+                els.displayName.textContent = currentUser;
+                els.loginScreen.classList.add('hidden');
+                els.mainScreen.classList.remove('hidden');
+            } else {
+                els.loginScreen.classList.remove('hidden');
+                els.mainScreen.classList.add('hidden');
+            }
+            
+            // 로딩 숨기기 (인증 성공 여부와 상관없이 즉시)
+            els.loading.classList.add('hidden');
+
+            // 백그라운드에서 인증 시도 (성공하면 좋고, 실패해도 상관없음)
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
                 } else {
-                    // 사용자 정보가 없으면 익명 로그인 시도
-                    doAuth();
+                    await signInAnonymously(auth);
                 }
+            } catch (err) {
+                console.warn("Auth skipped or failed:", err.message);
+            }
+
+            // 인증 리스너
+            onAuthStateChanged(auth, (user) => {
+                authUser = user;
+                startSync();
             });
 
-            const doAuth = async () => {
-                try {
-                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                        await signInWithCustomToken(auth, __initial_auth_token);
-                    } else {
-                        await signInAnonymously(auth);
-                    }
-                } catch (err) {
-                    console.error("Auth Failure:", err);
-                    els.loading.classList.add('hidden');
-                    if (err.code === 'auth/configuration-not-found' || err.code === 'auth/operation-not-allowed') {
-                        els.errorOverlay.classList.remove('hidden');
-                        els.errorText.innerHTML = "Firebase <b>익명 로그인</b> 설정이 필요합니다.<br><small class='opacity-50 text-xs'>Authentication > Sign-in method에서 익명(Anonymous)을 활성화해주세요.</small>";
-                    } else {
-                        els.errorOverlay.classList.remove('hidden');
-                        els.errorText.textContent = "네트워크 오류가 발생했습니다. 잠시 후 다시 시도해주세요.";
-                    }
-                }
-            };
+            // 리스너가 호출되지 않을 경우를 대비해 직접 호출
+            startSync();
         }
 
-        // Event Handlers
         document.getElementById('btn-login').onclick = () => {
             const n = els.userSelect.value;
             if (n) {
@@ -416,7 +391,7 @@
         document.getElementById('btn-close-modal').onclick = () => els.modal.classList.add('hidden');
         
         els.btnSave.onclick = async () => {
-            if (!authUser || !currentUser) return;
+            if (!currentUser) return;
             const dist = parseFloat(els.inputDistance.value) || 0;
             const attr = els.inputAttendance.checked;
             const payload = {
@@ -428,19 +403,26 @@
             try {
                 els.btnSave.disabled = true;
                 els.btnSave.textContent = "저장 중...";
-                await setDoc(doc(db, 'artifacts', appId, 'users', authUser.uid, 'records', selectedDateStr), payload);
+                
+                // 공용 데이터 저장소에 바로 저장 (인증이 없어도 규칙이 허용하면 저장됨)
+                // 규칙이 'if true' 인 경우 가장 안정적으로 작동
                 await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'records', `${currentUser}_${selectedDateStr}`), payload);
+                
+                // 인증된 경우에만 개인 저장소에도 백업
+                if (authUser) {
+                    await setDoc(doc(db, 'artifacts', appId, 'users', authUser.uid, 'records', selectedDateStr), payload);
+                }
+                
                 els.modal.classList.add('hidden');
             } catch (e) { 
                 console.error("Save Error:", e);
-                alert("데이터 저장에 실패했습니다. Firebase 규칙을 확인해주세요.");
+                alert("데이터 저장에 실패했습니다. Firebase Database의 Rules(규칙) 탭에서 쓰기 권한이 'allow read, write: if true;'로 되어있는지 확인해주세요.");
             } finally {
                 els.btnSave.disabled = false;
                 els.btnSave.textContent = "데이터 저장";
             }
         };
 
-        // 앱 시작
         init();
     </script>
 </body>
