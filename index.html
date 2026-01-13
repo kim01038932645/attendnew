@@ -28,6 +28,16 @@
             </div>
         </div>
 
+        <!-- Error Message Overlay -->
+        <div id="error-overlay" class="hidden fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-6 text-center">
+            <div class="bg-white p-8 rounded-3xl max-w-sm">
+                <div class="text-red-500 text-5xl mb-4">⚠️</div>
+                <h3 class="text-xl font-bold mb-2">인증 설정 오류</h3>
+                <p id="error-text" class="text-gray-600 text-sm mb-6 leading-relaxed">Firebase 콘솔에서 'Anonymous' 인증을 활성화해야 합니다.</p>
+                <button onclick="location.reload()" class="w-full bg-blue-600 text-white py-3 rounded-xl font-bold">다시 시도</button>
+            </div>
+        </div>
+
         <!-- Login Screen -->
         <div id="screen-login" class="hidden p-6 flex flex-col items-center justify-center min-h-screen">
             <div class="text-center mb-10">
@@ -151,7 +161,7 @@
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Environment Variables with User provided Fallback
+        // Firebase Configuration (Using Environment Variables if available, else provided fallback)
         const userProvidedConfig = {
             apiKey: "AIzaSyBBP8vP90bOisbNlDpsp64k3hxLZw7x2JE",
             authDomain: "attendnew-63c66.firebaseapp.com",
@@ -204,86 +214,10 @@
             calendarBody: document.getElementById('calendar-body'),
             displayName: document.getElementById('display-name'),
             rankDist: document.getElementById('rank-distance'),
-            rankAttr: document.getElementById('rank-attendance')
+            rankAttr: document.getElementById('rank-attendance'),
+            errorOverlay: document.getElementById('error-overlay'),
+            errorText: document.getElementById('error-text')
         };
-
-        // Initialize App
-        async function initApp() {
-            // Fill Member Select
-            members.forEach(m => {
-                const opt = document.createElement('option');
-                opt.value = m;
-                opt.textContent = m;
-                elements.userSelect.appendChild(opt);
-            });
-
-            // Authentication Handler (Rule 3)
-            const handleAuth = async () => {
-                try {
-                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                        await signInWithCustomToken(auth, __initial_auth_token);
-                    } else {
-                        await signInAnonymously(auth);
-                    }
-                } catch (err) {
-                    console.error("Auth Failure:", err);
-                }
-            };
-
-            await handleAuth();
-
-            onAuthStateChanged(auth, (user) => {
-                if (user) {
-                    authUser = user;
-                    elements.loading.classList.add('hidden');
-                    startPublicListener();
-
-                    const savedName = localStorage.getItem('srt_d_user_name');
-                    if (savedName && members.includes(savedName)) {
-                        enterApp(savedName);
-                    } else {
-                        elements.loginScreen.classList.remove('hidden');
-                    }
-                }
-            });
-        }
-
-        // Public Ranking Listener (Rule 1 Path)
-        function startPublicListener() {
-            if (!authUser) return;
-            const publicRef = collection(db, 'artifacts', appId, 'public', 'data', 'records');
-            
-            if (unsubPublic) unsubPublic();
-            unsubPublic = onSnapshot(publicRef, (snapshot) => {
-                allRecords = [];
-                snapshot.forEach(doc => {
-                    allRecords.push({ ...doc.data(), id: doc.id });
-                });
-                updateRankings();
-            }, (err) => console.error("Public Sync Error:", err));
-        }
-
-        // Entering App Logic
-        function enterApp(name) {
-            if (!authUser) return;
-            currentUser = name;
-            elements.displayName.textContent = name;
-            elements.loginScreen.classList.add('hidden');
-            elements.mainScreen.classList.remove('hidden');
-            
-            // Private Records Listener (Rule 1 Path)
-            const privateRef = collection(db, 'artifacts', appId, 'users', authUser.uid, 'records');
-            
-            if (unsubPrivate) unsubPrivate();
-            unsubPrivate = onSnapshot(privateRef, (snapshot) => {
-                userData = {};
-                snapshot.forEach(doc => {
-                    userData[doc.id] = doc.data();
-                });
-                renderCalendar();
-                updateStats();
-            }, (err) => console.error("Private Sync Error:", err));
-        }
 
         // UI Update Functions
         function updateStats() {
@@ -402,7 +336,7 @@
                 elements.btnSave.disabled = true;
                 elements.btnSave.textContent = "저장 중...";
                 
-                // Rule 1: Private and Public Dual Write
+                // Rule 1 & Rule 3: Write after Auth
                 await setDoc(doc(db, 'artifacts', appId, 'users', authUser.uid, 'records', selectedDateStr), payload);
                 await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'records', `${currentUser}_${selectedDateStr}`), payload);
                 
@@ -414,6 +348,82 @@
                 elements.btnSave.textContent = "데이터 저장";
             }
         };
+
+        // Firebase Sync Listeners
+        function startPublicListener() {
+            if (!authUser) return;
+            const publicRef = collection(db, 'artifacts', appId, 'public', 'data', 'records');
+            if (unsubPublic) unsubPublic();
+            unsubPublic = onSnapshot(publicRef, (snapshot) => {
+                allRecords = [];
+                snapshot.forEach(doc => allRecords.push({ ...doc.data(), id: doc.id }));
+                updateRankings();
+            }, (err) => console.error("Public Sync Error:", err));
+        }
+
+        function enterApp(name) {
+            if (!authUser) return;
+            currentUser = name;
+            elements.displayName.textContent = name;
+            elements.loginScreen.classList.add('hidden');
+            elements.mainScreen.classList.remove('hidden');
+            
+            const privateRef = collection(db, 'artifacts', appId, 'users', authUser.uid, 'records');
+            if (unsubPrivate) unsubPrivate();
+            unsubPrivate = onSnapshot(privateRef, (snapshot) => {
+                userData = {};
+                snapshot.forEach(doc => userData[doc.id] = doc.data());
+                renderCalendar();
+                updateStats();
+            }, (err) => console.error("Private Sync Error:", err));
+        }
+
+        // Initialize App Logic
+        async function initApp() {
+            // Fill Member Select
+            members.forEach(m => {
+                const opt = document.createElement('option');
+                opt.value = m;
+                opt.textContent = m;
+                elements.userSelect.appendChild(opt);
+            });
+
+            // Authentication Handler (Rule 3)
+            const handleAuth = async () => {
+                try {
+                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                        await signInWithCustomToken(auth, __initial_auth_token);
+                    } else {
+                        // Attempt Anonymous Sign-in (Required for this setup)
+                        await signInAnonymously(auth);
+                    }
+                } catch (err) {
+                    console.error("Auth Failure:", err);
+                    if (err.code === 'auth/configuration-not-found') {
+                        elements.errorText.innerHTML = "Firebase 콘솔에서 <b>익명 로그인(Anonymous)</b> 기능을 활성화해야 합니다.<br><br><small class='text-gray-400'>Authentication -> Sign-in method -> 익명 로그인 활성화</small>";
+                        elements.errorOverlay.classList.remove('hidden');
+                        elements.loading.classList.add('hidden');
+                    }
+                }
+            };
+
+            onAuthStateChanged(auth, (user) => {
+                if (user) {
+                    authUser = user;
+                    elements.loading.classList.add('hidden');
+                    startPublicListener();
+
+                    const savedName = localStorage.getItem('srt_d_user_name');
+                    if (savedName && members.includes(savedName)) {
+                        enterApp(savedName);
+                    } else {
+                        elements.loginScreen.classList.remove('hidden');
+                    }
+                }
+            });
+
+            await handleAuth();
+        }
 
         // Event Listeners
         document.getElementById('btn-login').onclick = () => {
@@ -443,6 +453,7 @@
         document.getElementById('btn-close-modal').onclick = closeModal;
         elements.btnSave.onclick = saveRecord;
 
+        // Run entry point
         initApp();
     </script>
 </body>
