@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SRT D조 출석부</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap');
+        body { font-family: 'Noto Sans KR', sans-serif; -webkit-tap-highlight-color: transparent; }
+        .gradient-bg { background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); }
+        .glass-card { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        input[type="number"]::-webkit-inner-spin-button,
+        input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+
+<div id="app" class="max-w-md mx-auto min-h-screen flex flex-col">
+    <!-- Header -->
+    <header class="gradient-bg text-white p-6 rounded-b-3xl shadow-lg">
+        <h1 class="text-2xl font-bold text-center">SRT D조 출석부</h1>
+        <p class="text-center text-sm opacity-80 mt-1">2026 Season (Jan - Jul)</p>
+    </header>
+
+    <!-- Global Month Selector -->
+    <div class="px-4 pt-4">
+        <div class="flex overflow-x-auto py-2 gap-2 no-scrollbar bg-white rounded-xl shadow-sm px-3 border border-gray-200">
+            <button onclick="changeGlobalMonth(1)" class="month-btn-global flex-shrink-0 px-4 py-1 rounded-full border text-xs" data-m="1">1월</button>
+            <button onclick="changeGlobalMonth(2)" class="month-btn-global flex-shrink-0 px-4 py-1 rounded-full border text-xs" data-m="2">2월</button>
+            <button onclick="changeGlobalMonth(3)" class="month-btn-global flex-shrink-0 px-4 py-1 rounded-full border text-xs" data-m="3">3월</button>
+            <button onclick="changeGlobalMonth(4)" class="month-btn-global flex-shrink-0 px-4 py-1 rounded-full border text-xs" data-m="4">4월</button>
+            <button onclick="changeGlobalMonth(5)" class="month-btn-global flex-shrink-0 px-4 py-1 rounded-full border text-xs" data-m="5">5월</button>
+            <button onclick="changeGlobalMonth(6)" class="month-btn-global flex-shrink-0 px-4 py-1 rounded-full border text-xs" data-m="6">6월</button>
+            <button onclick="changeGlobalMonth(7)" class="month-btn-global flex-shrink-0 px-4 py-1 rounded-full border text-xs" data-m="7">7월</button>
+        </div>
+    </div>
+
+    <main class="flex-grow p-4 space-y-6">
+        <!-- Main Screen -->
+        <div id="main-screen" class="space-y-6">
+            <section class="glass-card p-6 rounded-2xl shadow-sm border border-gray-200">
+                <h2 class="text-lg font-bold mb-4 flex items-center text-gray-800">
+                    <span class="mr-2">👤</span> 본인 확인
+                </h2>
+                <div class="space-y-3">
+                    <select id="name-select" class="w-full p-3 border rounded-xl bg-white focus:ring-2 focus:ring-blue-500 outline-none appearance-none">
+                        <option value="">이름을 선택하세요</option>
+                    </select>
+                    <button onclick="login()" class="w-full gradient-bg text-white font-bold py-3 rounded-xl shadow-md active:scale-95 transition-transform">
+                        내 기록 관리하기
+                    </button>
+                </div>
+            </section>
+
+            <!-- Distance Ranking -->
+            <section class="glass-card p-6 rounded-2xl shadow-sm border border-gray-200">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-lg font-bold text-gray-800">🏃 월간 거리 랭킹 (TOP 8)</h2>
+                    <span class="current-month-display text-sm font-medium text-blue-600">1월</span>
+                </div>
+                <div id="dist-ranking-list" class="space-y-2">
+                    <p class="text-gray-400 text-center py-4 text-sm">데이터를 불러오는 중...</p>
+                </div>
+            </section>
+
+            <!-- Attendance Ranking -->
+            <section class="glass-card p-6 rounded-2xl shadow-sm border border-gray-200">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-lg font-bold text-gray-800">📅 월간 출석 랭킹 (TOP 8)</h2>
+                    <span class="current-month-display text-sm font-medium text-green-600">1월</span>
+                </div>
+                <div id="attr-ranking-list" class="space-y-2">
+                    <p class="text-gray-400 text-center py-4 text-sm">데이터를 불러오는 중...</p>
+                </div>
+            </section>
+        </div>
+
+        <!-- Detail Screen -->
+        <div id="detail-screen" class="hidden space-y-4">
+            <button onclick="showMain()" class="text-blue-600 font-medium flex items-center mb-2 text-sm">
+                ← 메인 화면으로
+            </button>
+            
+            <section class="glass-card p-5 rounded-2xl shadow-sm border border-gray-200 sticky top-2 z-10">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 id="user-welcome" class="text-lg font-bold text-gray-800">님 기록</h2>
+                        <p class="text-[10px] text-gray-400">거리는 매일, 출석은 수/일만 가능</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-[10px] text-gray-500 font-bold">MY TOTAL</p>
+                        <p id="user-total-dist" class="text-xl font-bold text-blue-600">0 km</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Daily Entry List -->
+            <div id="daily-list" class="space-y-2 pb-10">
+                <!-- Days injected here -->
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer Status -->
+    <div id="status-bar" class="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-sm px-4 py-2 text-center text-[10px] text-gray-400 border-t z-50">
+        연결 중...
+    </div>
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, doc, getDoc, setDoc, onSnapshot, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    const members = ["강동현", "강동훈", "송채한", "김미화", "김재산", "김찬석", "김한나", "류지찬", "박성환", "박종봉", "소병득", "서정화", "신영섭", "안지훈", "오한천", "이승준", "이용구", "정덕수", "주효석", "서인수", "박창선", "김병식"];
+    
+    const firebaseConfig = {
+  apiKey: "AIzaSyBBP8vP90bOisbNlDpsp64k3hxLZw7x2JE",
+  authDomain: "attendnew-63c66.firebaseapp.com",
+  databaseURL: "https://attendnew-63c66-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "attendnew-63c66",
+  storageBucket: "attendnew-63c66.firebasestorage.app",
+  messagingSenderId: "992717620682",
+  appId: "1:992717620682:web:5ee93256b2a5172d72fb33"
+};
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'srt-d-group-checkin';
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    let currentUser = null;
+    let selectedName = "";
+    let globalData = {};
+    let viewMonth = new Date().getMonth() + 1;
+    if(viewMonth > 7) viewMonth = 1;
+
+    const nameSelect = document.getElementById('name-select');
+    const mainScreen = document.getElementById('main-screen');
+    const detailScreen = document.getElementById('detail-screen');
+    const statusBar = document.getElementById('status-bar');
+
+    members.sort().forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m;
+        opt.textContent = m;
+        nameSelect.appendChild(opt);
+    });
+
+    async function initAuth() {
+        try {
+            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                await signInWithCustomToken(auth, __initial_auth_token);
+            } else {
+                await signInAnonymously(auth);
+            }
+        } catch (e) {
+            statusBar.textContent = "연결 오류";
+        }
+    }
+
+    onAuthStateChanged(auth, (user) => {
+        if (user) {
+            currentUser = user;
+            statusBar.textContent = "실시간 연동 완료";
+            listenToData();
+        }
+    });
+
+    function listenToData() {
+        if (!currentUser) return;
+        const publicDataRef = doc(db, 'artifacts', appId, 'public', 'data', 'records', 'global');
+        
+        onSnapshot(publicDataRef, (docSnap) => {
+            globalData = docSnap.exists() ? docSnap.data() : {};
+            renderRankings();
+            if (!detailScreen.classList.contains('hidden')) renderDetail();
+        }, (err) => {
+            statusBar.textContent = "데이터 로딩 오류";
+        });
+    }
+
+    window.changeGlobalMonth = (m) => {
+        viewMonth = m;
+        renderRankings();
+        if (!detailScreen.classList.contains('hidden')) renderDetail();
+    };
+
+    function renderRankings() {
+        const monthKey = `m2026_${viewMonth}`;
+        const distRank = [];
+        const attrRank = [];
+
+        document.querySelectorAll('.current-month-display').forEach(el => el.textContent = `${viewMonth}월`);
+        document.querySelectorAll('.month-btn-global').forEach(btn => {
+            if (parseInt(btn.dataset.m) === viewMonth) {
+                btn.classList.add('bg-blue-600', 'text-white', 'border-blue-600');
+            } else {
+                btn.classList.remove('bg-blue-600', 'text-white', 'border-blue-600');
+            }
+        });
+
+        members.forEach(m => {
+            const userData = globalData[m] || {};
+            const monthData = userData[monthKey] || {};
+            let totalDist = 0;
+            let attendCount = 0;
+
+            Object.keys(monthData).forEach(date => {
+                const dayInfo = monthData[date] || {};
+                if (dayInfo.checked) attendCount++;
+                totalDist += parseFloat(dayInfo.dist || 0);
+            });
+
+            distRank.push({ name: m, val: totalDist });
+            attrRank.push({ name: m, val: attendCount });
+        });
+
+        const topDist = [...distRank].sort((a, b) => b.val - a.val).slice(0, 8);
+        const topAttr = [...attrRank].sort((a, b) => b.val - a.val).slice(0, 8);
+
+        document.getElementById('dist-ranking-list').innerHTML = topDist.map((item, idx) => `
+            <div class="flex items-center justify-between p-2 ${idx < 3 ? 'bg-blue-50/50' : ''} rounded-lg border-b border-gray-50 last:border-0">
+                <div class="flex items-center">
+                    <span class="w-6 text-center font-bold text-xs ${idx === 0 ? 'text-yellow-500' : idx === 1 ? 'text-slate-400' : idx === 2 ? 'text-amber-600' : 'text-gray-300'}">${idx + 1}</span>
+                    <span class="text-sm font-medium ml-2 text-gray-700">${item.name}</span>
+                </div>
+                <span class="text-sm font-bold text-blue-600">${item.val.toFixed(1)}<span class="text-[10px] ml-0.5">km</span></span>
+            </div>
+        `).join('');
+
+        document.getElementById('attr-ranking-list').innerHTML = topAttr.map((item, idx) => `
+            <div class="flex items-center justify-between p-2 ${idx < 3 ? 'bg-green-50/50' : ''} rounded-lg border-b border-gray-50 last:border-0">
+                <div class="flex items-center">
+                    <span class="w-6 text-center font-bold text-xs text-gray-300">${idx + 1}</span>
+                    <span class="text-sm font-medium ml-2 text-gray-700">${item.name}</span>
+                </div>
+                <span class="text-sm font-bold text-green-600">${item.val}<span class="text-[10px] ml-0.5 text-green-500">회</span></span>
+            </div>
+        `).join('');
+    }
+
+    window.login = () => {
+        const name = nameSelect.value;
+        if (!name) { alert("이름을 선택해 주세요."); return; }
+        selectedName = name;
+        mainScreen.classList.add('hidden');
+        detailScreen.classList.remove('hidden');
+        document.getElementById('user-welcome').textContent = `${selectedName}님`;
+        renderDetail();
+        window.scrollTo(0,0);
+    };
+
+    window.showMain = () => {
+        detailScreen.classList.add('hidden');
+        mainScreen.classList.remove('hidden');
+        window.scrollTo(0,0);
+    };
+
+    function renderDetail() {
+        const monthKey = `m2026_${viewMonth}`;
+        const userData = globalData[selectedName] || {};
+        const monthData = userData[monthKey] || {};
+
+        let totalMonthly = 0;
+        Object.keys(monthData).forEach(dk => {
+            totalMonthly += parseFloat(monthData[dk].dist || 0);
+        });
+        document.getElementById('user-total-dist').textContent = `${totalMonthly.toFixed(1)} km`;
+
+        const dailyList = document.getElementById('daily-list');
+        dailyList.innerHTML = "";
+        
+        const year = 2026;
+        const startDate = new Date(year, viewMonth - 1, 1);
+        const endDate = new Date(year, viewMonth, 0);
+
+        for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+            const day = d.getDay();
+            const dateStr = d.toISOString().split('T')[0];
+            const dayInfo = monthData[dateStr] || { checked: false, dist: 0 };
+            const isMeetingDay = (day === 0 || day === 3);
+            
+            const dayCard = document.createElement('div');
+            dayCard.className = `glass-card p-3 rounded-xl border flex items-center justify-between ${isMeetingDay ? 'border-blue-200 bg-blue-50/30' : 'border-gray-100'}`;
+            
+            dayCard.innerHTML = `
+                <div class="flex items-center space-x-3">
+                    <div class="text-center w-8">
+                        <p class="text-[9px] ${day === 0 ? 'text-red-500' : day === 6 ? 'text-blue-400' : 'text-gray-400'} font-bold">
+                            ${['일','월','화','수','목','금','토'][day]}
+                        </p>
+                        <p class="font-bold text-base leading-tight">${d.getDate()}</p>
+                    </div>
+                    <div class="flex items-center bg-white border rounded-lg px-2 py-1">
+                        <input type="number" step="0.1" placeholder="0" 
+                            value="${dayInfo.dist || ''}"
+                            class="w-10 text-sm font-bold text-center outline-none bg-transparent"
+                            onchange="saveEntry('${dateStr}', this.value, ${dayInfo.checked})">
+                        <span class="text-[10px] text-gray-400 ml-1">km</span>
+                    </div>
+                </div>
+                ${isMeetingDay ? `
+                    <button onclick="toggleAttend('${dateStr}', ${dayInfo.dist}, ${!dayInfo.checked})" 
+                        class="px-4 py-2 rounded-lg text-xs font-bold transition-all ${dayInfo.checked ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-500'}">
+                        ${dayInfo.checked ? '출석완료' : '출석체크'}
+                    </button>
+                ` : `
+                    <span class="text-[10px] text-gray-300 mr-2 font-medium italic">Daily Record</span>
+                `}
+            `;
+            dailyList.appendChild(dayCard);
+        }
+    }
+
+    window.saveEntry = async (dateStr, dist, checked) => {
+        if (!currentUser) return;
+        const monthKey = `m2026_${viewMonth}`;
+        const updatePath = `${selectedName}.${monthKey}.${dateStr}`;
+        
+        statusBar.textContent = "저장 중...";
+        try {
+            const publicDataRef = doc(db, 'artifacts', appId, 'public', 'data', 'records', 'global');
+            const snap = await getDoc(publicDataRef);
+            const entry = { dist: parseFloat(dist) || 0, checked: Boolean(checked) };
+            
+            if (!snap.exists()) {
+                await setDoc(publicDataRef, { [selectedName]: { [monthKey]: { [dateStr]: entry } } });
+            } else {
+                await updateDoc(publicDataRef, { [updatePath]: entry });
+            }
+            statusBar.textContent = "저장 완료";
+        } catch (e) {
+            statusBar.textContent = "저장 오류";
+        }
+    };
+
+    window.toggleAttend = (dateStr, dist, newChecked) => {
+        window.saveEntry(dateStr, dist, newChecked);
+    };
+
+    initAuth();
+</script>
+</body>
+</html>
