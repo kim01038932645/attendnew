@@ -15,88 +15,101 @@
         .training-day::after { content: '•'; position: absolute; top: 2px; right: 4px; color: #3b82f6; font-size: 14px; }
         @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
         .animate-slide-up { animation: slideUp 0.3s ease-out; }
+        .tab-active { color: #2563eb; border-bottom: 2px solid #2563eb; }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-900">
 
-    <div id="app" class="max-w-md mx-auto min-h-screen bg-white shadow-2xl relative">
+    <div id="app" class="max-w-md mx-auto min-h-screen bg-white shadow-2xl relative flex flex-col">
         
-        <!-- 강제 초기 로딩 화면 (최대 1.5초 후 자동 소멸) -->
+        <!-- 로딩 화면 -->
         <div id="loading-overlay" class="fixed inset-0 bg-white z-[100] flex items-center justify-center transition-opacity duration-500">
             <div class="flex flex-col items-center">
                 <div class="animate-spin rounded-full h-10 w-10 border-4 border-blue-600 border-t-transparent"></div>
-                <p class="mt-4 text-slate-500 font-bold text-sm">데이터 연결 시도 중...</p>
+                <p class="mt-4 text-slate-500 font-bold text-sm tracking-tight">데이터 연결 중...</p>
             </div>
         </div>
 
-        <!-- 로그인/이름 선택 화면 -->
-        <div id="screen-login" class="hidden p-8 flex flex-col items-center justify-center min-h-screen">
-            <div class="text-center mb-10">
+        <!-- [화면 1] 로그인 + 랭킹 화면 -->
+        <div id="screen-login" class="hidden flex-1 flex flex-col p-6 overflow-y-auto">
+            <div class="text-center py-10">
                 <div class="inline-block p-4 bg-blue-50 rounded-full mb-4 text-3xl">🏃‍♂️</div>
                 <h1 class="text-3xl font-black text-slate-900 tracking-tighter">SRT D조</h1>
                 <p class="text-slate-400 font-bold mt-1 text-xs tracking-widest uppercase">2026 Season</p>
             </div>
             
-            <div class="w-full space-y-4">
+            <!-- 접속 영역 -->
+            <div class="w-full space-y-4 mb-10">
                 <div class="bg-slate-50 p-5 rounded-3xl border border-slate-100">
-                    <label class="block text-[10px] font-black mb-2 text-slate-400 uppercase ml-1">Member Name</label>
+                    <label class="block text-[10px] font-black mb-2 text-slate-400 uppercase ml-1">Member Login</label>
                     <select id="user-select" class="w-full p-4 bg-white border border-slate-200 rounded-2xl text-lg font-bold outline-none focus:ring-4 focus:ring-blue-100 transition-all appearance-none">
                         <option value="">본인 이름을 선택하세요</option>
                     </select>
                 </div>
                 <button id="btn-login" class="w-full bg-blue-600 text-white py-5 rounded-3xl text-xl font-black shadow-lg shadow-blue-200 active:scale-95 transition-all">
-                    접속하기
+                    내 출석부 들어가기
                 </button>
+            </div>
+
+            <!-- 첫화면 랭킹 섹션 -->
+            <div class="flex-1 flex flex-col">
+                <div class="flex items-center justify-between mb-2 px-2">
+                    <h3 class="text-xs font-black text-slate-800 uppercase tracking-widest">Crew Ranking</h3>
+                    <span class="text-[9px] bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full font-bold uppercase tracking-tighter">Real-time</span>
+                </div>
+
+                <!-- 랭킹 탭 -->
+                <div class="flex border-b border-slate-100 mb-4 px-2">
+                    <button id="tab-dist" class="flex-1 py-3 text-xs font-black text-slate-400 tab-active transition-all">누적 거리순</button>
+                    <button id="tab-attr" class="flex-1 py-3 text-xs font-black text-slate-400 transition-all">출석 횟수순</button>
+                </div>
+
+                <div class="grid grid-cols-1 gap-3 mb-8" id="rank-list-login">
+                    <!-- 랭킹 리스트 -->
+                </div>
             </div>
         </div>
 
-        <!-- 메인 화면 -->
-        <div id="screen-main" class="hidden">
+        <!-- [화면 2] 내 출석부 화면 -->
+        <div id="screen-main" class="hidden flex-1 flex flex-col overflow-y-auto">
             <header class="bg-slate-900 text-white p-8 rounded-b-[2.5rem] shadow-xl">
                 <div class="flex justify-between items-center mb-6">
                     <div>
                         <p class="text-[10px] font-bold text-blue-400 uppercase mb-1">Crew Member</p>
-                        <span id="display-name" class="text-2xl font-black"></span><span class="opacity-60 font-medium">님</span>
+                        <span id="display-name" class="text-2xl font-black"></span><span class="opacity-60 font-medium ml-1 text-sm">러너</span>
                     </div>
-                    <button id="btn-logout" class="bg-white/10 p-2.5 rounded-xl text-xs font-bold">로그아웃</button>
+                    <button id="btn-logout" class="bg-white/10 px-4 py-2.5 rounded-xl text-xs font-bold border border-white/10 active:bg-white/20">홈으로</button>
                 </div>
                 <div class="grid grid-cols-2 gap-3">
                     <div class="bg-white/5 p-4 rounded-2xl border border-white/10">
-                        <p class="text-[9px] font-black text-blue-400 mb-1 uppercase">Distance</p>
-                        <p class="text-xl font-black"><span id="stats-dist">0.0</span> <small class="text-[10px] opacity-40">km</small></p>
+                        <p class="text-[9px] font-black text-blue-400 mb-1 uppercase tracking-wider">Distance</p>
+                        <p class="text-xl font-black"><span id="stats-dist">0.0</span> <small class="text-[10px] opacity-40 uppercase">km</small></p>
                     </div>
                     <div class="bg-white/5 p-4 rounded-2xl border border-white/10">
-                        <p class="text-[9px] font-black text-emerald-400 mb-1 uppercase">Attendance</p>
-                        <p class="text-xl font-black"><span id="stats-attr">0</span> <small class="text-[10px] opacity-40">회</small></p>
+                        <p class="text-[9px] font-black text-emerald-400 mb-1 uppercase tracking-wider">Attendance</p>
+                        <p class="text-xl font-black"><span id="stats-attr">0</span> <small class="text-[10px] opacity-40 uppercase">회</small></p>
                     </div>
                 </div>
             </header>
 
-            <main class="p-5">
+            <main class="p-5 flex-1">
                 <div class="flex items-center justify-between mb-6">
-                    <button id="btn-prev-month" class="p-3 text-slate-400 font-bold">〈</button>
+                    <button id="btn-prev-month" class="p-3 text-slate-400 font-bold active:bg-slate-100 rounded-full">〈</button>
                     <h2 id="calendar-title" class="text-xl font-black text-slate-800">2026년 1월</h2>
-                    <button id="btn-next-month" class="p-3 text-slate-400 font-bold">〉</button>
+                    <button id="btn-next-month" class="p-3 text-slate-400 font-bold active:bg-slate-100 rounded-full">〉</button>
                 </div>
 
                 <div class="calendar-grid mb-3 px-1 text-center">
-                    <div class="text-[10px] font-black text-red-400">S</div>
-                    <div class="text-[10px] font-black text-slate-300">M</div>
-                    <div class="text-[10px] font-black text-slate-300">T</div>
-                    <div class="text-[10px] font-black text-blue-400">W</div>
-                    <div class="text-[10px] font-black text-slate-300">T</div>
-                    <div class="text-[10px] font-black text-slate-300">F</div>
-                    <div class="text-[10px] font-black text-slate-300">S</div>
+                    <div class="text-[10px] font-black text-red-400 uppercase">Sun</div>
+                    <div class="text-[10px] font-black text-slate-300 uppercase">Mon</div>
+                    <div class="text-[10px] font-black text-slate-300 uppercase">Tue</div>
+                    <div class="text-[10px] font-black text-blue-400 uppercase">Wed</div>
+                    <div class="text-[10px] font-black text-slate-300 uppercase">Thu</div>
+                    <div class="text-[10px] font-black text-slate-300 uppercase">Fri</div>
+                    <div class="text-[10px] font-black text-slate-300 uppercase">Sat</div>
                 </div>
                 <div id="calendar-body" class="calendar-grid"></div>
-
-                <!-- 실시간 랭킹 섹션 -->
-                <div class="mt-8">
-                    <h3 class="text-xs font-black text-slate-800 uppercase tracking-widest mb-4 px-2">Crew Ranking (Jan)</h3>
-                    <div class="grid grid-cols-1 gap-3" id="rank-list">
-                        <!-- 랭킹 아이템 -->
-                    </div>
-                </div>
+                <p class="mt-6 text-[10px] text-slate-300 text-center font-bold uppercase tracking-widest">Tap date to record your run</p>
             </main>
         </div>
 
@@ -105,22 +118,22 @@
             <div class="bg-white w-full max-w-sm rounded-[2.5rem] p-8 animate-slide-up shadow-2xl">
                 <div class="flex justify-between items-start mb-6">
                     <div>
-                        <p class="text-[10px] font-black text-blue-600 mb-1">DATE</p>
+                        <p class="text-[10px] font-black text-blue-600 mb-1 uppercase tracking-widest">Input Activity</p>
                         <h3 id="modal-date" class="text-xl font-black text-slate-800">2026-01-01</h3>
                     </div>
-                    <button id="btn-close-modal" class="text-slate-300 text-xl">✕</button>
+                    <button id="btn-close-modal" class="w-8 h-8 flex items-center justify-center bg-slate-100 rounded-full text-slate-400 text-sm">✕</button>
                 </div>
                 
                 <div class="space-y-6">
                     <div>
-                        <label class="block text-[10px] font-black mb-2 text-slate-400">RUNNING DISTANCE (KM)</label>
+                        <label class="block text-[10px] font-black mb-2 text-slate-400 uppercase">Run Distance (KM)</label>
                         <input type="number" id="input-distance" step="0.1" class="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl text-2xl font-black outline-none focus:border-blue-500 focus:bg-white transition-all" placeholder="0.0">
                     </div>
                     <div id="attendance-area" class="flex items-center justify-between p-4 bg-blue-50/50 rounded-2xl border border-blue-100">
                         <span class="text-blue-900 font-bold text-sm">정기 훈련 출석 체크</span>
-                        <input type="checkbox" id="input-attendance" class="w-6 h-6 rounded-lg accent-blue-600">
+                        <input type="checkbox" id="input-attendance" class="w-6 h-6 rounded-lg accent-blue-600 cursor-pointer">
                     </div>
-                    <button id="btn-save" class="w-full py-4 bg-blue-600 text-white rounded-2xl font-black text-lg active:scale-95 transition-all">기록 저장하기</button>
+                    <button id="btn-save" class="w-full py-5 bg-blue-600 text-white rounded-2xl font-black text-lg shadow-xl shadow-blue-100 active:scale-95 transition-all">기록 저장하기</button>
                 </div>
             </div>
         </div>
@@ -130,7 +143,7 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getFirestore, doc, setDoc, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Firebase 설정 (직접 입력된 정보 사용)
+        // Firebase 설정
         const firebaseConfig = {
             apiKey: "AIzaSyBBP8vP90bOisbNlDpsp64k3hxLZw7x2JE",
             authDomain: "attendnew-63c66.firebaseapp.com",
@@ -140,23 +153,20 @@
             appId: "1:992717620682:web:5ee93256b2a5172d72fb33"
         };
 
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
         const appId = "srt-d-crew-2026";
-
         const members = [
             "강동현", "강동훈", "송채한", "김미화", "김재산", "김찬석", "김한나", "류지찬", 
             "박성환", "박종봉", "소병득", "서정화", "신영섭", "안지훈", "오한천", "이승준", 
             "이용구", "정덕수", "주효석", "서인수", "박창선", "김병식"
         ].sort();
 
-        // 상태
+        let db;
         let currentUser = localStorage.getItem('srt_user_name') || null;
         let currentMonth = new Date(2026, 0, 1);
         let selectedDateStr = "";
-        let allRecords = []; 
+        let allRecords = [];
+        let currentRankType = 'distance'; // 'distance' | 'attendance'
 
-        // 요소
         const els = {
             loading: document.getElementById('loading-overlay'),
             loginScreen: document.getElementById('screen-login'),
@@ -164,35 +174,42 @@
             userSelect: document.getElementById('user-select'),
             calendarTitle: document.getElementById('calendar-title'),
             calendarBody: document.getElementById('calendar-body'),
-            rankList: document.getElementById('rank-list'),
+            rankListLogin: document.getElementById('rank-list-login'),
             modal: document.getElementById('modal'),
             modalDate: document.getElementById('modal-date'),
             inputDistance: document.getElementById('input-distance'),
             inputAttendance: document.getElementById('input-attendance'),
-            btnSave: document.getElementById('btn-save')
+            btnSave: document.getElementById('btn-save'),
+            statsDist: document.getElementById('stats-dist'),
+            statsAttr: document.getElementById('stats-attr'),
+            tabDist: document.getElementById('tab-dist'),
+            tabAttr: document.getElementById('tab-attr')
         };
 
-        // 초기화
         function init() {
-            // 이름 선택 옵션 추가
+            try {
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+            } catch (e) {
+                console.error("Firebase Init Error", e);
+            }
+
             members.forEach(m => {
                 const opt = document.createElement('option');
                 opt.value = m; opt.textContent = m;
                 els.userSelect.appendChild(opt);
             });
 
-            // 로그인 상태 확인
             if (currentUser && members.includes(currentUser)) {
                 showMain();
             } else {
                 showLogin();
             }
 
-            // 로딩 화면 강제 제거 (데이터 응답이 늦더라도 1.5초 후엔 제거)
             setTimeout(() => {
                 els.loading.style.opacity = '0';
                 setTimeout(() => els.loading.classList.add('hidden'), 500);
-            }, 1500);
+            }, 800);
 
             startSync();
         }
@@ -200,6 +217,7 @@
         function showLogin() {
             els.loginScreen.classList.remove('hidden');
             els.mainScreen.classList.add('hidden');
+            renderRanking();
         }
 
         function showMain() {
@@ -207,29 +225,29 @@
             els.loginScreen.classList.add('hidden');
             els.mainScreen.classList.remove('hidden');
             renderCalendar();
+            updateStats();
         }
 
-        // 실시간 동기화
         function startSync() {
-            const pubRef = collection(db, 'artifacts', appId, 'public', 'data', 'records');
-            onSnapshot(pubRef, (snap) => {
+            if (!db) return;
+            const colRef = collection(db, 'artifacts', appId, 'public', 'data', 'records');
+            onSnapshot(colRef, (snap) => {
                 allRecords = snap.docs.map(d => ({ ...d.data(), id: d.id }));
                 renderCalendar();
                 renderRanking();
                 updateStats();
-            }, (err) => {
-                console.warn("Firestore Error: 권한 부족 또는 연결 끊김", err);
-            });
+            }, (err) => console.error("Firestore Error:", err));
         }
 
         function renderRanking() {
             const y = currentMonth.getFullYear(), m = currentMonth.getMonth();
             const scores = {};
-            members.forEach(m => scores[m] = { dist: 0, attr: 0 });
+            members.forEach(name => scores[name] = { dist: 0, attr: 0 });
 
             allRecords.forEach(r => {
-                const [name, ds] = r.id.split('_');
-                if (!scores[name]) return;
+                const name = r.userName;
+                const ds = r.date;
+                if (!name || !ds || !scores[name]) return;
                 const d = new Date(ds);
                 if (d.getFullYear() === y && d.getMonth() === m) {
                     scores[name].dist += parseFloat(r.distance || 0);
@@ -237,31 +255,50 @@
                 }
             });
 
-            const sorted = Object.entries(scores)
-                .sort((a, b) => b[1].dist - a[1].dist)
-                .slice(0, 10);
+            let sorted = Object.entries(scores).filter(([_, s]) => s.dist > 0 || s.attr > 0);
 
-            els.rankList.innerHTML = sorted.map(([name, s], i) => `
-                <div class="flex items-center justify-between bg-white p-4 rounded-2xl border border-slate-100">
+            if (currentRankType === 'distance') {
+                sorted.sort((a, b) => b[1].dist - a[1].dist || b[1].attr - a[1].attr);
+            } else {
+                sorted.sort((a, b) => b[1].attr - a[1].attr || b[1].dist - a[1].dist);
+            }
+
+            sorted = sorted.slice(0, 15);
+
+            const container = els.rankListLogin;
+            if (sorted.length === 0) {
+                container.innerHTML = '<div class="bg-slate-50 border-2 border-dashed border-slate-200 rounded-3xl p-10 text-center"><p class="text-slate-400 text-xs font-bold uppercase tracking-tighter">No data available for this month</p></div>';
+                return;
+            }
+
+            container.innerHTML = sorted.map(([name, s], i) => `
+                <div class="flex items-center justify-between bg-white p-4 rounded-2xl border border-slate-100 shadow-sm ${name === currentUser ? 'ring-2 ring-blue-600 ring-offset-2' : ''}">
                     <div class="flex items-center">
-                        <span class="w-6 text-xs font-black text-slate-300">${i+1}</span>
-                        <span class="font-bold text-slate-700">${name}</span>
+                        <div class="w-6 flex flex-col items-center">
+                            <span class="text-[10px] font-black ${i < 3 ? 'text-blue-600' : 'text-slate-300'}">${i+1}</span>
+                            ${i < 3 ? '<span class="text-[8px]">🏆</span>' : ''}
+                        </div>
+                        <div class="ml-3">
+                            <p class="font-bold text-slate-800 leading-none mb-1">${name}</p>
+                            <p class="text-[8px] font-black text-slate-300 uppercase">${i < 3 ? 'Top Runner' : 'Crew'}</p>
+                        </div>
                     </div>
                     <div class="flex gap-4 items-center">
-                        <div class="text-right">
-                            <p class="text-[9px] font-black text-slate-300 uppercase leading-none mb-1">Dist</p>
-                            <p class="text-sm font-black text-blue-600 leading-none">${s.dist.toFixed(1)}</p>
+                        <div class="text-right ${currentRankType === 'distance' ? 'opacity-100 scale-105 transition-all' : 'opacity-40'}">
+                            <p class="text-[8px] font-black text-slate-400 uppercase mb-0.5">Dist</p>
+                            <p class="text-sm font-black text-blue-600 leading-none">${s.dist.toFixed(1)}<small class="text-[9px] font-medium ml-0.5">km</small></p>
                         </div>
-                        <div class="text-right">
-                            <p class="text-[9px] font-black text-slate-300 uppercase leading-none mb-1">Attr</p>
-                            <p class="text-sm font-black text-emerald-600 leading-none">${s.attr}</p>
+                        <div class="text-right border-l border-slate-100 pl-4 ${currentRankType === 'attendance' ? 'opacity-100 scale-105 transition-all' : 'opacity-40'}">
+                            <p class="text-[8px] font-black text-slate-400 uppercase mb-0.5">Attr</p>
+                            <p class="text-sm font-black text-emerald-600 leading-none">${s.attr}<small class="text-[9px] font-medium ml-0.5">회</small></p>
                         </div>
                     </div>
                 </div>
-            `).join('') || '<p class="text-center text-slate-400 text-xs py-4">데이터가 없습니다.</p>';
+            `).join('');
         }
 
         function updateStats() {
+            if (!currentUser) return;
             const y = currentMonth.getFullYear(), m = currentMonth.getMonth();
             let dSum = 0, aSum = 0;
             allRecords.forEach(r => {
@@ -273,8 +310,8 @@
                     }
                 }
             });
-            document.getElementById('stats-dist').textContent = dSum.toFixed(1);
-            document.getElementById('stats-attr').textContent = aSum;
+            els.statsDist.textContent = dSum.toFixed(1);
+            els.statsAttr.textContent = aSum;
         }
 
         function renderCalendar() {
@@ -294,15 +331,15 @@
                 const isT = date.getDay() === 0 || date.getDay() === 3;
                 
                 const cell = document.createElement('div');
-                cell.className = `calendar-day active-day ${isT ? 'training-day' : ''}`;
+                cell.className = `calendar-day active-day ${isT ? 'training-day shadow-sm' : ''}`;
                 
                 const rec = myRecords[ds] || {};
                 const dist = parseFloat(rec.distance) || 0;
                 
                 cell.innerHTML = `
                     <div class="${date.getDay() === 0 ? 'text-red-500' : ''}">${d}</div>
-                    <div class="text-[9px] font-black mt-1 text-blue-600">${dist > 0 ? dist : ''}</div>
-                    ${rec.attendance ? '<div class="absolute bottom-1 w-1 h-1 rounded-full bg-emerald-500"></div>' : ''}
+                    <div class="text-[9px] font-black mt-1 text-blue-600 h-3">${dist > 0 ? dist : ''}</div>
+                    ${rec.attendance ? '<div class="absolute bottom-1.5 w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-sm border border-white"></div>' : ''}
                 `;
                 
                 cell.onclick = () => {
@@ -317,7 +354,21 @@
             }
         }
 
-        // 이벤트
+        // --- 이벤트 ---
+        els.tabDist.onclick = () => {
+            currentRankType = 'distance';
+            els.tabDist.classList.add('tab-active');
+            els.tabAttr.classList.remove('tab-active');
+            renderRanking();
+        };
+
+        els.tabAttr.onclick = () => {
+            currentRankType = 'attendance';
+            els.tabAttr.classList.add('tab-active');
+            els.tabDist.classList.remove('tab-active');
+            renderRanking();
+        };
+
         document.getElementById('btn-login').onclick = () => {
             const n = els.userSelect.value;
             if (n) {
@@ -328,8 +379,9 @@
         };
 
         document.getElementById('btn-logout').onclick = () => {
-            localStorage.removeItem('srt_user_name');
-            location.reload();
+            els.loginScreen.classList.remove('hidden');
+            els.mainScreen.classList.add('hidden');
+            renderRanking();
         };
 
         document.getElementById('btn-prev-month').onclick = () => {
@@ -347,27 +399,53 @@
         document.getElementById('btn-close-modal').onclick = () => els.modal.classList.add('hidden');
 
         els.btnSave.onclick = async () => {
+            if (!currentUser || !selectedDateStr) return;
             const dist = parseFloat(els.inputDistance.value) || 0;
             const attr = els.inputAttendance.checked;
+            
             const payload = {
                 distance: dist,
                 attendance: !!attr,
                 userName: currentUser,
                 date: selectedDateStr,
-                ts: Date.now()
+                updatedAt: new Date().toISOString()
             };
 
             try {
+                // 저장 버튼 시각 피드백: 저장 중
                 els.btnSave.disabled = true;
+                els.btnSave.classList.replace('bg-blue-600', 'bg-slate-400');
                 els.btnSave.textContent = "저장 중...";
-                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'records', `${currentUser}_${selectedDateStr}`), payload);
-                els.modal.classList.add('hidden');
+                
+                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'records', `${currentUser}_${selectedDateStr}`);
+                await setDoc(docRef, payload);
+                
+                // 성공 피드백: 저장 완료!
+                els.btnSave.classList.replace('bg-slate-400', 'bg-emerald-500');
+                els.btnSave.textContent = "저장 완료!";
+                
+                // 0.5초 뒤 자동으로 화면 닫기
+                setTimeout(() => {
+                    els.modal.classList.add('hidden');
+                    
+                    // 다음 입력을 위해 버튼 초기 상태로 복구 (닫힌 뒤 수행)
+                    setTimeout(() => {
+                        els.btnSave.disabled = false;
+                        els.btnSave.classList.remove('bg-emerald-500');
+                        els.btnSave.classList.add('bg-blue-600');
+                        els.btnSave.textContent = "기록 저장하기";
+                    }, 300);
+                }, 500);
+                
             } catch (err) {
-                console.error(err);
-                alert("저장 실패! Firebase Rules에서 쓰기 권한을 확인하세요.");
-            } finally {
+                console.error("Save Error:", err);
                 els.btnSave.disabled = false;
-                els.btnSave.textContent = "기록 저장하기";
+                els.btnSave.classList.replace('bg-slate-400', 'bg-red-500');
+                els.btnSave.textContent = "실패! 다시 시도";
+                setTimeout(() => {
+                    els.btnSave.classList.replace('bg-red-500', 'bg-blue-600');
+                    els.btnSave.textContent = "기록 저장하기";
+                }, 2000);
             }
         };
 
