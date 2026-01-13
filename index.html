@@ -8,149 +8,119 @@
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; -webkit-tap-highlight-color: transparent; }
         .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
-        .calendar-day { min-height: 64px; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 12px; font-size: 0.75rem; transition: all 0.2s; position: relative; }
-        .active-day { background-color: #f8fafc; border: 1px solid #f1f5f9; cursor: pointer; }
+        .calendar-day { min-height: 60px; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 12px; font-size: 0.75rem; transition: all 0.2s; position: relative; border: 1px solid transparent; }
+        .active-day { background-color: #f8fafc; border-color: #f1f5f9; cursor: pointer; }
         .active-day:active { background-color: #f1f5f9; transform: scale(0.95); }
-        .training-day { font-weight: 800; color: #1d4ed8; background-color: #eff6ff; border: 1px solid #bfdbfe; }
+        .training-day { font-weight: 800; color: #1d4ed8; background-color: #eff6ff; border-color: #bfdbfe; }
         .training-day::after { content: '•'; position: absolute; top: 2px; right: 4px; color: #3b82f6; font-size: 14px; }
         @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
-        .animate-slide-up { animation: slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        .animate-slide-up { animation: slideUp 0.3s ease-out; }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-900">
 
-    <div id="app" class="max-w-md mx-auto min-h-screen bg-white shadow-2xl overflow-x-hidden relative">
-        <!-- Loading Spinner -->
-        <div id="loading" class="fixed inset-0 bg-white z-[60] flex items-center justify-center">
+    <div id="app" class="max-w-md mx-auto min-h-screen bg-white shadow-2xl relative">
+        
+        <!-- 강제 초기 로딩 화면 (최대 1.5초 후 자동 소멸) -->
+        <div id="loading-overlay" class="fixed inset-0 bg-white z-[100] flex items-center justify-center transition-opacity duration-500">
             <div class="flex flex-col items-center">
-                <div class="animate-spin rounded-full h-12 w-12 border-4 border-blue-600 border-t-transparent"></div>
-                <p class="mt-4 text-slate-500 font-bold tracking-tight">시스템 준비 중...</p>
+                <div class="animate-spin rounded-full h-10 w-10 border-4 border-blue-600 border-t-transparent"></div>
+                <p class="mt-4 text-slate-500 font-bold text-sm">데이터 연결 시도 중...</p>
             </div>
         </div>
 
-        <!-- Login Screen -->
+        <!-- 로그인/이름 선택 화면 -->
         <div id="screen-login" class="hidden p-8 flex flex-col items-center justify-center min-h-screen">
-            <div class="text-center mb-12">
-                <div class="inline-block p-3 bg-blue-50 rounded-2xl mb-4">
-                    <span class="text-4xl">🏃‍♂️</span>
-                </div>
-                <h1 class="text-4xl font-black text-slate-900 tracking-tighter">SRT D조</h1>
-                <p class="text-slate-500 font-medium mt-2 uppercase tracking-widest text-xs">Running Crew 2026</p>
+            <div class="text-center mb-10">
+                <div class="inline-block p-4 bg-blue-50 rounded-full mb-4 text-3xl">🏃‍♂️</div>
+                <h1 class="text-3xl font-black text-slate-900 tracking-tighter">SRT D조</h1>
+                <p class="text-slate-400 font-bold mt-1 text-xs tracking-widest uppercase">2026 Season</p>
             </div>
             
             <div class="w-full space-y-4">
                 <div class="bg-slate-50 p-5 rounded-3xl border border-slate-100">
-                    <label class="block text-xs font-black mb-3 text-slate-400 uppercase ml-1">Member Select</label>
-                    <select id="user-select" class="w-full p-4 bg-white border border-slate-200 rounded-2xl text-lg font-bold outline-none focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all appearance-none">
+                    <label class="block text-[10px] font-black mb-2 text-slate-400 uppercase ml-1">Member Name</label>
+                    <select id="user-select" class="w-full p-4 bg-white border border-slate-200 rounded-2xl text-lg font-bold outline-none focus:ring-4 focus:ring-blue-100 transition-all appearance-none">
                         <option value="">본인 이름을 선택하세요</option>
                     </select>
                 </div>
-                <button id="btn-login" class="w-full bg-blue-600 text-white py-5 rounded-3xl text-xl font-black shadow-xl shadow-blue-200 active:scale-95 transition-all">
-                    시작하기
+                <button id="btn-login" class="w-full bg-blue-600 text-white py-5 rounded-3xl text-xl font-black shadow-lg shadow-blue-200 active:scale-95 transition-all">
+                    접속하기
                 </button>
-            </div>
-
-            <div class="w-full mt-10 bg-slate-50 p-6 rounded-[2rem] border border-slate-100">
-                <h2 class="text-sm font-black mb-5 flex items-center text-slate-800 uppercase tracking-wider">
-                    <span class="mr-2">🔥</span> Monthly Leaders
-                </h2>
-                <div class="grid grid-cols-2 gap-6">
-                    <div class="space-y-4">
-                        <h3 class="text-[10px] font-black text-blue-600 uppercase tracking-widest">Distance (km)</h3>
-                        <ul id="rank-distance" class="text-xs space-y-3"></ul>
-                    </div>
-                    <div class="space-y-4">
-                        <h3 class="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Attendance</h3>
-                        <ul id="rank-attendance" class="text-xs space-y-3"></ul>
-                    </div>
-                </div>
             </div>
         </div>
 
-        <!-- Main Screen -->
+        <!-- 메인 화면 -->
         <div id="screen-main" class="hidden">
-            <header class="bg-slate-900 text-white p-8 rounded-b-[3rem] shadow-2xl">
-                <div class="flex justify-between items-center mb-8">
+            <header class="bg-slate-900 text-white p-8 rounded-b-[2.5rem] shadow-xl">
+                <div class="flex justify-between items-center mb-6">
                     <div>
-                        <p class="text-[10px] font-bold text-blue-400 uppercase tracking-widest mb-1">Welcome back</p>
-                        <span id="display-name" class="text-3xl font-black"></span><span class="text-xl font-medium opacity-60 ml-1">님</span>
+                        <p class="text-[10px] font-bold text-blue-400 uppercase mb-1">Crew Member</p>
+                        <span id="display-name" class="text-2xl font-black"></span><span class="opacity-60 font-medium">님</span>
                     </div>
-                    <button id="btn-logout" class="bg-white/10 hover:bg-white/20 p-3 rounded-2xl transition-all">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                        </svg>
-                    </button>
+                    <button id="btn-logout" class="bg-white/10 p-2.5 rounded-xl text-xs font-bold">로그아웃</button>
                 </div>
-                <div class="grid grid-cols-2 gap-4">
-                    <div class="bg-white/5 p-5 rounded-[2rem] border border-white/10 backdrop-blur-md">
-                        <p class="text-[10px] uppercase font-black text-blue-400 mb-2">Distance</p>
-                        <p class="text-2xl font-black"><span id="stats-dist">0.0</span><span class="text-xs ml-1 opacity-40">km</span></p>
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="bg-white/5 p-4 rounded-2xl border border-white/10">
+                        <p class="text-[9px] font-black text-blue-400 mb-1 uppercase">Distance</p>
+                        <p class="text-xl font-black"><span id="stats-dist">0.0</span> <small class="text-[10px] opacity-40">km</small></p>
                     </div>
-                    <div class="bg-white/5 p-5 rounded-[2rem] border border-white/10 backdrop-blur-md">
-                        <p class="text-[10px] uppercase font-black text-emerald-400 mb-2">Check-in</p>
-                        <p class="text-2xl font-black"><span id="stats-attr">0</span><span class="text-xs ml-1 opacity-40">회</span></p>
+                    <div class="bg-white/5 p-4 rounded-2xl border border-white/10">
+                        <p class="text-[9px] font-black text-emerald-400 mb-1 uppercase">Attendance</p>
+                        <p class="text-xl font-black"><span id="stats-attr">0</span> <small class="text-[10px] opacity-40">회</small></p>
                     </div>
                 </div>
             </header>
 
-            <main class="p-6">
-                <div class="flex items-center justify-between mb-8 px-2">
-                    <button id="btn-prev-month" class="w-12 h-12 flex items-center justify-center bg-slate-100 rounded-2xl text-xl font-bold active:scale-90 transition-all text-slate-400">〈</button>
-                    <h2 id="calendar-title" class="text-2xl font-black text-slate-800 tracking-tighter">2026년 1월</h2>
-                    <button id="btn-next-month" class="w-12 h-12 flex items-center justify-center bg-slate-100 rounded-2xl text-xl font-bold active:scale-90 transition-all text-slate-400">〉</button>
+            <main class="p-5">
+                <div class="flex items-center justify-between mb-6">
+                    <button id="btn-prev-month" class="p-3 text-slate-400 font-bold">〈</button>
+                    <h2 id="calendar-title" class="text-xl font-black text-slate-800">2026년 1월</h2>
+                    <button id="btn-next-month" class="p-3 text-slate-400 font-bold">〉</button>
                 </div>
 
-                <div class="calendar-grid mb-4 px-1">
-                    <div class="text-center text-[10px] font-black text-red-400">SUN</div>
-                    <div class="text-center text-[10px] font-black text-slate-300">MON</div>
-                    <div class="text-center text-[10px] font-black text-slate-300">TUE</div>
-                    <div class="text-center text-[10px] font-black text-blue-400">WED</div>
-                    <div class="text-center text-[10px] font-black text-slate-300">THU</div>
-                    <div class="text-center text-[10px] font-black text-slate-300">FRI</div>
-                    <div class="text-center text-[10px] font-black text-slate-300">SAT</div>
+                <div class="calendar-grid mb-3 px-1 text-center">
+                    <div class="text-[10px] font-black text-red-400">S</div>
+                    <div class="text-[10px] font-black text-slate-300">M</div>
+                    <div class="text-[10px] font-black text-slate-300">T</div>
+                    <div class="text-[10px] font-black text-blue-400">W</div>
+                    <div class="text-[10px] font-black text-slate-300">T</div>
+                    <div class="text-[10px] font-black text-slate-300">F</div>
+                    <div class="text-[10px] font-black text-slate-300">S</div>
                 </div>
                 <div id="calendar-body" class="calendar-grid"></div>
 
-                <div class="mt-10 p-6 bg-slate-50 rounded-[2rem] border border-slate-100">
-                    <h4 class="text-xs font-black text-slate-800 mb-3 flex items-center">
-                        <span class="mr-2">ℹ️</span> 훈련 안내
-                    </h4>
-                    <ul class="text-[11px] text-slate-500 space-y-2 font-medium leading-relaxed">
-                        <li>• 수요일(야간), 일요일(오전) 공식 정기 훈련</li>
-                        <li>• 달린 날짜를 클릭하여 거리와 출석 여부를 입력하세요.</li>
-                        <li>• 모든 기록은 실시간 랭킹에 합산되어 반영됩니다.</li>
-                    </ul>
+                <!-- 실시간 랭킹 섹션 -->
+                <div class="mt-8">
+                    <h3 class="text-xs font-black text-slate-800 uppercase tracking-widest mb-4 px-2">Crew Ranking (Jan)</h3>
+                    <div class="grid grid-cols-1 gap-3" id="rank-list">
+                        <!-- 랭킹 아이템 -->
+                    </div>
                 </div>
             </main>
         </div>
 
-        <!-- Input Modal -->
-        <div id="modal" class="hidden fixed inset-0 bg-slate-900/60 z-[70] flex items-end sm:items-center justify-center p-4 backdrop-blur-sm">
-            <div class="bg-white w-full max-sm:rounded-t-[3rem] sm:rounded-[3rem] p-8 animate-slide-up shadow-2xl relative">
-                <div class="absolute top-4 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-slate-100 rounded-full sm:hidden"></div>
-                <div class="flex justify-between items-start mb-8 mt-2">
+        <!-- 입력 모달 -->
+        <div id="modal" class="hidden fixed inset-0 bg-slate-900/60 z-[110] flex items-end justify-center backdrop-blur-sm p-4">
+            <div class="bg-white w-full max-w-sm rounded-[2.5rem] p-8 animate-slide-up shadow-2xl">
+                <div class="flex justify-between items-start mb-6">
                     <div>
-                        <p class="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1">Record Entry</p>
-                        <h3 id="modal-date" class="text-2xl font-black text-slate-800">2026-01-01</h3>
+                        <p class="text-[10px] font-black text-blue-600 mb-1">DATE</p>
+                        <h3 id="modal-date" class="text-xl font-black text-slate-800">2026-01-01</h3>
                     </div>
-                    <button id="btn-close-modal" class="bg-slate-50 p-2 rounded-xl text-slate-400">✕</button>
+                    <button id="btn-close-modal" class="text-slate-300 text-xl">✕</button>
                 </div>
                 
                 <div class="space-y-6">
                     <div>
-                        <label class="block text-xs font-black mb-3 text-slate-400 uppercase tracking-wider ml-1">Distance (km)</label>
-                        <input type="number" id="input-distance" step="0.1" class="w-full p-5 bg-slate-50 border-2 border-transparent rounded-3xl text-3xl font-black outline-none focus:bg-white focus:border-blue-500 transition-all" placeholder="0.0">
+                        <label class="block text-[10px] font-black mb-2 text-slate-400">RUNNING DISTANCE (KM)</label>
+                        <input type="number" id="input-distance" step="0.1" class="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl text-2xl font-black outline-none focus:border-blue-500 focus:bg-white transition-all" placeholder="0.0">
                     </div>
-                    <div id="attendance-toggle-area" class="flex items-center justify-between p-6 bg-blue-50/50 rounded-3xl border border-blue-100">
-                        <div class="flex items-center">
-                            <span class="text-blue-900 font-bold">정기 훈련 출석함</span>
-                        </div>
-                        <label class="relative inline-flex items-center cursor-pointer">
-                            <input type="checkbox" id="input-attendance" class="sr-only peer">
-                            <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                        </label>
+                    <div id="attendance-area" class="flex items-center justify-between p-4 bg-blue-50/50 rounded-2xl border border-blue-100">
+                        <span class="text-blue-900 font-bold text-sm">정기 훈련 출석 체크</span>
+                        <input type="checkbox" id="input-attendance" class="w-6 h-6 rounded-lg accent-blue-600">
                     </div>
-                    <button id="btn-save" class="w-full py-5 bg-blue-600 text-white rounded-3xl font-black text-lg shadow-xl shadow-blue-100 active:scale-95 transition-all">데이터 저장</button>
+                    <button id="btn-save" class="w-full py-4 bg-blue-600 text-white rounded-2xl font-black text-lg active:scale-95 transition-all">기록 저장하기</button>
                 </div>
             </div>
         </div>
@@ -158,25 +128,21 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Firebase Setup
-        const userProvidedConfig = {
+        // Firebase 설정 (직접 입력된 정보 사용)
+        const firebaseConfig = {
             apiKey: "AIzaSyBBP8vP90bOisbNlDpsp64k3hxLZw7x2JE",
             authDomain: "attendnew-63c66.firebaseapp.com",
-            databaseURL: "https://attendnew-63c66-default-rtdb.asia-southeast1.firebasedatabase.app",
             projectId: "attendnew-63c66",
             storageBucket: "attendnew-63c66.firebasestorage.app",
             messagingSenderId: "992717620682",
             appId: "1:992717620682:web:5ee93256b2a5172d72fb33"
         };
 
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : userProvidedConfig;
         const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
         const db = getFirestore(app);
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'srt-d-group-2026';
+        const appId = "srt-d-crew-2026";
 
         const members = [
             "강동현", "강동훈", "송채한", "김미화", "김재산", "김찬석", "김한나", "류지찬", 
@@ -184,81 +150,131 @@
             "이용구", "정덕수", "주효석", "서인수", "박창선", "김병식"
         ].sort();
 
-        // Application State
-        let currentUser = localStorage.getItem('srt_d_name') || null;
-        let authUser = null;
+        // 상태
+        let currentUser = localStorage.getItem('srt_user_name') || null;
         let currentMonth = new Date(2026, 0, 1);
         let selectedDateStr = "";
-        let userData = {}; 
         let allRecords = []; 
 
+        // 요소
         const els = {
-            loading: document.getElementById('loading'),
+            loading: document.getElementById('loading-overlay'),
             loginScreen: document.getElementById('screen-login'),
             mainScreen: document.getElementById('screen-main'),
             userSelect: document.getElementById('user-select'),
+            calendarTitle: document.getElementById('calendar-title'),
+            calendarBody: document.getElementById('calendar-body'),
+            rankList: document.getElementById('rank-list'),
             modal: document.getElementById('modal'),
             modalDate: document.getElementById('modal-date'),
             inputDistance: document.getElementById('input-distance'),
             inputAttendance: document.getElementById('input-attendance'),
-            btnSave: document.getElementById('btn-save'),
-            statsDist: document.getElementById('stats-dist'),
-            statsAttr: document.getElementById('stats-attr'),
-            calendarTitle: document.getElementById('calendar-title'),
-            calendarBody: document.getElementById('calendar-body'),
-            displayName: document.getElementById('display-name'),
-            rankDist: document.getElementById('rank-distance'),
-            rankAttr: document.getElementById('rank-attendance')
+            btnSave: document.getElementById('btn-save')
         };
 
-        function updateStats() {
-            const y = currentMonth.getFullYear(), m = currentMonth.getMonth();
-            let dSum = 0, aSum = 0;
-            // userData에서 현재 월의 합계 계산 (사용자별 필터링은 sync에서 처리)
-            Object.keys(userData).forEach(ds => {
-                const dt = new Date(ds);
-                if (dt.getFullYear() === y && dt.getMonth() === m) {
-                    dSum += parseFloat(userData[ds].distance || 0);
-                    if (userData[ds].attendance) aSum++;
-                }
+        // 초기화
+        function init() {
+            // 이름 선택 옵션 추가
+            members.forEach(m => {
+                const opt = document.createElement('option');
+                opt.value = m; opt.textContent = m;
+                els.userSelect.appendChild(opt);
             });
-            els.statsDist.textContent = dSum.toFixed(1);
-            els.statsAttr.textContent = aSum;
+
+            // 로그인 상태 확인
+            if (currentUser && members.includes(currentUser)) {
+                showMain();
+            } else {
+                showLogin();
+            }
+
+            // 로딩 화면 강제 제거 (데이터 응답이 늦더라도 1.5초 후엔 제거)
+            setTimeout(() => {
+                els.loading.style.opacity = '0';
+                setTimeout(() => els.loading.classList.add('hidden'), 500);
+            }, 1500);
+
+            startSync();
         }
 
-        function updateRankings() {
-            const y = 2026, m = currentMonth.getMonth();
+        function showLogin() {
+            els.loginScreen.classList.remove('hidden');
+            els.mainScreen.classList.add('hidden');
+        }
+
+        function showMain() {
+            document.getElementById('display-name').textContent = currentUser;
+            els.loginScreen.classList.add('hidden');
+            els.mainScreen.classList.remove('hidden');
+            renderCalendar();
+        }
+
+        // 실시간 동기화
+        function startSync() {
+            const pubRef = collection(db, 'artifacts', appId, 'public', 'data', 'records');
+            onSnapshot(pubRef, (snap) => {
+                allRecords = snap.docs.map(d => ({ ...d.data(), id: d.id }));
+                renderCalendar();
+                renderRanking();
+                updateStats();
+            }, (err) => {
+                console.warn("Firestore Error: 권한 부족 또는 연결 끊김", err);
+            });
+        }
+
+        function renderRanking() {
+            const y = currentMonth.getFullYear(), m = currentMonth.getMonth();
             const scores = {};
-            members.forEach(n => scores[n] = { dist: 0, attr: 0 });
+            members.forEach(m => scores[m] = { dist: 0, attr: 0 });
 
             allRecords.forEach(r => {
                 const [name, ds] = r.id.split('_');
                 if (!scores[name]) return;
-                const dt = new Date(ds);
-                if (dt.getFullYear() === y && dt.getMonth() === m) {
+                const d = new Date(ds);
+                if (d.getFullYear() === y && d.getMonth() === m) {
                     scores[name].dist += parseFloat(r.distance || 0);
-                    if (r.attendance) scores[name].attr += 1;
+                    if (r.attendance) scores[name].attr++;
                 }
             });
 
-            const sortD = Object.entries(scores).sort((a,b) => b[1].dist - a[1].dist).slice(0, 8);
-            const sortA = Object.entries(scores).sort((a,b) => b[1].attr - a[1].attr).slice(0, 8);
+            const sorted = Object.entries(scores)
+                .sort((a, b) => b[1].dist - a[1].dist)
+                .slice(0, 10);
 
-            els.rankDist.innerHTML = sortD.map(([n, s], i) => `
-                <li class="flex justify-between items-center bg-white p-2 rounded-xl border border-slate-100">
-                    <span class="font-black text-slate-300 w-4">${i+1}</span>
-                    <span class="flex-1 font-bold text-slate-700 ml-2">${n}</span>
-                    <span class="text-blue-600 font-black">${s.dist.toFixed(1)}</span>
-                </li>
-            `).join('') || "데이터 없음";
+            els.rankList.innerHTML = sorted.map(([name, s], i) => `
+                <div class="flex items-center justify-between bg-white p-4 rounded-2xl border border-slate-100">
+                    <div class="flex items-center">
+                        <span class="w-6 text-xs font-black text-slate-300">${i+1}</span>
+                        <span class="font-bold text-slate-700">${name}</span>
+                    </div>
+                    <div class="flex gap-4 items-center">
+                        <div class="text-right">
+                            <p class="text-[9px] font-black text-slate-300 uppercase leading-none mb-1">Dist</p>
+                            <p class="text-sm font-black text-blue-600 leading-none">${s.dist.toFixed(1)}</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-[9px] font-black text-slate-300 uppercase leading-none mb-1">Attr</p>
+                            <p class="text-sm font-black text-emerald-600 leading-none">${s.attr}</p>
+                        </div>
+                    </div>
+                </div>
+            `).join('') || '<p class="text-center text-slate-400 text-xs py-4">데이터가 없습니다.</p>';
+        }
 
-            els.rankAttr.innerHTML = sortA.map(([n, s], i) => `
-                <li class="flex justify-between items-center bg-white p-2 rounded-xl border border-slate-100">
-                    <span class="font-black text-slate-300 w-4">${i+1}</span>
-                    <span class="flex-1 font-bold text-slate-700 ml-2">${n}</span>
-                    <span class="text-emerald-600 font-black">${s.attr}</span>
-                </li>
-            `).join('') || "데이터 없음";
+        function updateStats() {
+            const y = currentMonth.getFullYear(), m = currentMonth.getMonth();
+            let dSum = 0, aSum = 0;
+            allRecords.forEach(r => {
+                if (r.userName === currentUser) {
+                    const d = new Date(r.date);
+                    if (d.getFullYear() === y && d.getMonth() === m) {
+                        dSum += parseFloat(r.distance || 0);
+                        if (r.attendance) aSum++;
+                    }
+                }
+            });
+            document.getElementById('stats-dist').textContent = dSum.toFixed(1);
+            document.getElementById('stats-attr').textContent = aSum;
         }
 
         function renderCalendar() {
@@ -267,159 +283,91 @@
             const first = new Date(y, m, 1).getDay();
             const last = new Date(y, m + 1, 0).getDate();
 
-            for (let i = 0; i < first; i++) els.calendarBody.appendChild(Object.assign(document.createElement('div'), {className:'calendar-day'}));
+            for (let i = 0; i < first; i++) els.calendarBody.appendChild(document.createElement('div'));
+
+            const myRecords = {};
+            allRecords.filter(r => r.userName === currentUser).forEach(r => myRecords[r.date] = r);
 
             for (let d = 1; d <= last; d++) {
                 const date = new Date(y, m, d);
                 const ds = `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
                 const isT = date.getDay() === 0 || date.getDay() === 3;
+                
                 const cell = document.createElement('div');
                 cell.className = `calendar-day active-day ${isT ? 'training-day' : ''}`;
                 
-                const rec = userData[ds] || {};
-                const hasD = parseFloat(rec.distance) > 0;
-                const isA = rec.attendance;
+                const rec = myRecords[ds] || {};
+                const dist = parseFloat(rec.distance) || 0;
                 
                 cell.innerHTML = `
                     <div class="${date.getDay() === 0 ? 'text-red-500' : ''}">${d}</div>
-                    <div class="text-[9px] font-black mt-1 text-slate-400">${hasD ? rec.distance : ''}</div>
-                    ${isA ? '<div class="absolute bottom-1 w-1 h-1 rounded-full bg-emerald-500"></div>' : ''}
+                    <div class="text-[9px] font-black mt-1 text-blue-600">${dist > 0 ? dist : ''}</div>
+                    ${rec.attendance ? '<div class="absolute bottom-1 w-1 h-1 rounded-full bg-emerald-500"></div>' : ''}
                 `;
+                
                 cell.onclick = () => {
                     selectedDateStr = ds;
                     els.modalDate.textContent = ds;
                     els.inputDistance.value = rec.distance || '';
                     els.inputAttendance.checked = rec.attendance || false;
-                    document.getElementById('attendance-toggle-area').style.display = isT ? 'flex' : 'none';
+                    document.getElementById('attendance-area').style.display = isT ? 'flex' : 'none';
                     els.modal.classList.remove('hidden');
                 };
                 els.calendarBody.appendChild(cell);
             }
         }
 
-        // Firebase Sync - 인증 없이 공용 데이터 활용
-        function startSync() {
-            // Public 데이터 동기화 (랭킹용)
-            const pubRef = collection(db, 'artifacts', appId, 'public', 'data', 'records');
-            onSnapshot(pubRef, (snap) => {
-                allRecords = snap.docs.map(d => ({ ...d.data(), id: d.id }));
-                
-                // 현재 로그인한 사용자의 데이터만 userData에 추출
-                if (currentUser) {
-                    const prefix = `${currentUser}_`;
-                    const newUserDate = {};
-                    allRecords.forEach(r => {
-                        if (r.id.startsWith(prefix)) {
-                            const dateKey = r.id.replace(prefix, "");
-                            newUserDate[dateKey] = r;
-                        }
-                    });
-                    userData = newUserDate;
-                    renderCalendar(); 
-                    updateStats();
-                }
-                updateRankings();
-            }, e => {
-                console.error("데이터 동기화 실패. Firebase 규칙(Rule)을 확인하세요:", e);
-                // 규칙 오류 시 로컬 데이터만이라도 렌더링하도록 유도 가능
-            });
-        }
-
-        async function init() {
-            // 멤버 목록 셋업
-            members.forEach(m => {
-                const o = document.createElement('option');
-                o.value = m; o.textContent = m;
-                els.userSelect.appendChild(o);
-            });
-
-            // 인증 무시하고 일단 화면 표시
-            if (currentUser && members.includes(currentUser)) {
-                els.displayName.textContent = currentUser;
-                els.loginScreen.classList.add('hidden');
-                els.mainScreen.classList.remove('hidden');
-            } else {
-                els.loginScreen.classList.remove('hidden');
-                els.mainScreen.classList.add('hidden');
-            }
-            
-            // 로딩 숨기기 (인증 성공 여부와 상관없이 즉시)
-            els.loading.classList.add('hidden');
-
-            // 백그라운드에서 인증 시도 (성공하면 좋고, 실패해도 상관없음)
-            try {
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
-                }
-            } catch (err) {
-                console.warn("Auth skipped or failed:", err.message);
-            }
-
-            // 인증 리스너
-            onAuthStateChanged(auth, (user) => {
-                authUser = user;
-                startSync();
-            });
-
-            // 리스너가 호출되지 않을 경우를 대비해 직접 호출
-            startSync();
-        }
-
+        // 이벤트
         document.getElementById('btn-login').onclick = () => {
             const n = els.userSelect.value;
             if (n) {
-                localStorage.setItem('srt_d_name', n);
-                location.reload();
+                localStorage.setItem('srt_user_name', n);
+                currentUser = n;
+                showMain();
             }
         };
+
         document.getElementById('btn-logout').onclick = () => {
-            localStorage.removeItem('srt_d_name');
+            localStorage.removeItem('srt_user_name');
             location.reload();
         };
+
         document.getElementById('btn-prev-month').onclick = () => {
             currentMonth.setMonth(currentMonth.getMonth() - 1);
             els.calendarTitle.textContent = `${currentMonth.getFullYear()}년 ${currentMonth.getMonth() + 1}월`;
-            renderCalendar(); updateStats(); updateRankings();
+            renderCalendar(); renderRanking(); updateStats();
         };
+
         document.getElementById('btn-next-month').onclick = () => {
             currentMonth.setMonth(currentMonth.getMonth() + 1);
             els.calendarTitle.textContent = `${currentMonth.getFullYear()}년 ${currentMonth.getMonth() + 1}월`;
-            renderCalendar(); updateStats(); updateRankings();
+            renderCalendar(); renderRanking(); updateStats();
         };
+
         document.getElementById('btn-close-modal').onclick = () => els.modal.classList.add('hidden');
-        
+
         els.btnSave.onclick = async () => {
-            if (!currentUser) return;
             const dist = parseFloat(els.inputDistance.value) || 0;
             const attr = els.inputAttendance.checked;
             const payload = {
-                distance: dist, attendance: !!attr,
-                userName: currentUser, date: selectedDateStr,
-                updatedAt: new Date().toISOString()
+                distance: dist,
+                attendance: !!attr,
+                userName: currentUser,
+                date: selectedDateStr,
+                ts: Date.now()
             };
 
             try {
                 els.btnSave.disabled = true;
                 els.btnSave.textContent = "저장 중...";
-                
-                // 공용 데이터 저장소에 바로 저장 (인증이 없어도 규칙이 허용하면 저장됨)
-                // 규칙이 'if true' 인 경우 가장 안정적으로 작동
                 await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'records', `${currentUser}_${selectedDateStr}`), payload);
-                
-                // 인증된 경우에만 개인 저장소에도 백업
-                if (authUser) {
-                    await setDoc(doc(db, 'artifacts', appId, 'users', authUser.uid, 'records', selectedDateStr), payload);
-                }
-                
                 els.modal.classList.add('hidden');
-            } catch (e) { 
-                console.error("Save Error:", e);
-                alert("데이터 저장에 실패했습니다. Firebase Database의 Rules(규칙) 탭에서 쓰기 권한이 'allow read, write: if true;'로 되어있는지 확인해주세요.");
+            } catch (err) {
+                console.error(err);
+                alert("저장 실패! Firebase Rules에서 쓰기 권한을 확인하세요.");
             } finally {
                 els.btnSave.disabled = false;
-                els.btnSave.textContent = "데이터 저장";
+                els.btnSave.textContent = "기록 저장하기";
             }
         };
 
