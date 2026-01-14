@@ -2,64 +2,225 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>SRT D조 출석부</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Firebase SDK v11 (Compat Mode) -->
+    <script src="https://www.gstatic.com/firebasejs/11.1.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.1.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore-compat.js"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
-        body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
-        .animate-fade-in { animation: fadeIn 0.3s ease-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;800&display=swap');
+        body { font-family: 'Pretendard', sans-serif; -webkit-tap-highlight-color: transparent; word-break: keep-all; }
+        
+        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+        .day-cell { aspect-ratio: 1/1.2; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 0.85rem; border-radius: 12px; cursor: pointer; transition: all 0.2s; background: #fff; border: 1px solid #f1f5f9; }
+        .day-cell:active { transform: scale(0.95); background-color: #f8fafc; }
+        .official-day { border-color: #dbeafe; background-color: #f0f7ff; color: #1e40af; font-weight: 800; position: relative; }
+        .official-day::before { content: '공식'; position: absolute; top: 2px; right: 2px; font-size: 6px; color: #3b82f6; }
+        .has-record { background-color: #3b82f6 !important; color: white !important; border: none !important; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3); }
+        
+        .name-card { transition: all 0.15s ease-out; background: #fff; border: 1px solid #f1f5f9; position: relative; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
+        .name-card:active { transform: scale(0.95); background-color: #eff6ff; }
+        .name-card::after { content: ''; position: absolute; bottom: 0; left: 0; width: 100%; height: 3px; background: #3b82f6; opacity: 0; transition: opacity 0.2s; }
+        .name-card.active::after { opacity: 1; }
+
+        ::-webkit-scrollbar { display: none; }
+        .no-scroll { overflow: hidden; position: fixed; width: 100%; }
+        .modal-up { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
     </style>
 </head>
-<body class="bg-slate-50">
-    <div id="app" class="min-h-screen max-w-lg mx-auto shadow-2xl relative border-x border-gray-200 flex flex-col bg-slate-50">
-        <!-- 초기 로딩 화면 -->
-        <div id="loading-screen" class="fixed inset-0 z-[200] bg-white flex flex-col items-center justify-center gap-4">
-            <div class="animate-spin text-blue-600"><i data-lucide="loader-2" size="40"></i></div>
-            <p id="loading-text" class="font-bold text-slate-400 text-sm text-center px-6">
-                시스템 초기화 중...<br>
-                <span class="text-[10px] font-normal mt-2 block">배포 시 Firebase 설정이 필요합니다.</span>
-            </p>
-        </div>
+<body class="bg-[#f8fafc] text-slate-900 select-none">
 
-        <header class="bg-blue-600 text-white p-4 flex justify-between items-center sticky top-0 z-30 shadow-lg">
-            <div class="flex items-center gap-2 cursor-pointer" onclick="router.go('home')">
-                <i data-lucide="activity" size="20"></i>
-                <h1 class="font-black text-lg tracking-tighter">SRT D조</h1>
-            </div>
-            <button onclick="admin.showModal()" class="p-2 hover:bg-white/10 rounded-full transition">
-                <i data-lucide="settings" size="20"></i>
-            </button>
-        </header>
-
-        <main id="main-content" class="flex-1 overflow-y-auto p-3 space-y-4"></main>
-
-        <!-- 관리자 모달 -->
-        <div id="admin-modal" class="hidden fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
-            <div class="bg-white w-full max-w-xs rounded-[3rem] p-8 shadow-2xl space-y-6 text-center">
-                <h3 class="font-black text-xl text-slate-800">관리자 확인</h3>
-                <input type="password" id="admin-password-input" class="w-full bg-slate-50 border-2 border-slate-50 rounded-2xl p-4 text-center text-2xl font-black outline-none focus:border-blue-100 shadow-inner">
-                <div class="flex gap-2">
-                    <button onclick="admin.hideModal()" class="flex-1 py-4 bg-slate-100 text-slate-400 rounded-2xl font-black text-sm">취소</button>
-                    <button onclick="admin.verify()" class="flex-2 py-4 bg-blue-600 text-white rounded-2xl font-black text-sm shadow-lg px-8">확인</button>
-                </div>
+<div id="app" class="max-w-md mx-auto min-h-screen flex flex-col relative pb-10">
+    <!-- 로딩 스피너 -->
+    <div id="loading" class="fixed inset-0 bg-white/90 backdrop-blur-md z-[200] flex items-center justify-center">
+        <div class="flex flex-col items-center p-8 text-center">
+            <div class="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4"></div>
+            <p id="loading-text" class="text-sm font-bold text-slate-500 tracking-tight">데이터 서버에 연결하는 중...</p>
+            <div id="auth-error-box" class="hidden mt-4 p-4 bg-red-50 rounded-2xl border border-red-100">
+                <p class="text-[11px] text-red-500 font-bold leading-relaxed">
+                    [시스템 알림]<br>
+                    인증 서비스 연결에 제한이 있습니다.<br>
+                    데이터 읽기 전용 모드로 전환을 시도합니다.
+                </p>
+                <button onclick="hideLoader()" class="mt-3 text-[10px] bg-red-500 text-white px-4 py-2 rounded-lg font-black uppercase">무시하고 계속하기</button>
             </div>
         </div>
     </div>
 
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, doc, setDoc, onSnapshot, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+    <!-- 헤더 -->
+    <header class="p-6 pt-12 text-center space-y-1">
+        <div class="flex items-center justify-center gap-2">
+            <span class="text-3xl font-black text-[#FF6B00] italic tracking-tighter">SRT</span>
+            <h1 class="text-4xl font-black text-slate-900 tracking-tighter">D-TEAM</h1>
+        </div>
+        <p class="text-[11px] text-slate-400 font-bold tracking-[0.2em] uppercase">Running Record Management</p>
+    </header>
 
-        /**
-         * 배포 에러 해결을 위한 중요 가이드:
-         * 1. 아래 YOUR_... 부분에 본인의 Firebase 콘솔 설정값을 넣으세요.
-         * 2. Canvas 환경에서는 주입된 값을 사용하고, 배포 환경에서는 하드코딩된 값을 사용하도록 로직을 수정했습니다.
-         */
-        const myFirebaseConfig = {
+    <!-- 관리자 버튼 -->
+    <button onclick="askAdminPassword()" class="absolute top-6 right-6 z-40 p-2 text-slate-200 hover:text-blue-600 transition-colors">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.533 1.533 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd" />
+        </svg>
+    </button>
+
+    <!-- 메인 View -->
+    <main id="main-view" class="px-5 space-y-10">
+        <section>
+            <div class="flex items-center justify-between mb-4 px-1">
+                <h2 class="text-xs font-black text-slate-400 uppercase tracking-widest">Members</h2>
+                <div class="flex items-center gap-2">
+                     <span id="member-count-badge" class="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">0명</span>
+                     <span class="text-[10px] font-bold text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full animate-pulse">실시간</span>
+                </div>
+            </div>
+            <div id="name-grid" class="grid grid-cols-4 gap-2.5 min-h-[100px]">
+                <div class="col-span-4 py-10 text-center text-slate-300 text-xs font-bold italic">데이터 동기화 중...</div>
+            </div>
+        </section>
+
+        <section class="space-y-4">
+            <div class="flex items-end justify-between px-1">
+                <h2 class="text-xs font-black text-slate-400 uppercase tracking-widest">Monthly Rank</h2>
+                <span id="rank-month-label" class="text-[10px] font-black bg-slate-900 text-white px-3 py-1 rounded-lg">전체</span>
+            </div>
+            <div class="grid grid-cols-1 gap-4">
+                <div class="bg-white p-6 rounded-[28px] shadow-sm border border-slate-100">
+                    <div class="text-[11px] font-black text-blue-600 mb-5 flex items-center gap-2">
+                        <div class="w-1.5 h-3.5 bg-blue-600 rounded-full"></div> 누적 거리 TOP 5
+                    </div>
+                    <ul id="dist-rank-list" class="space-y-3.5"></ul>
+                </div>
+                <div class="bg-white p-6 rounded-[28px] shadow-sm border border-slate-100">
+                    <div class="text-[11px] font-black text-indigo-600 mb-5 flex items-center gap-2">
+                        <div class="w-1.5 h-3.5 bg-indigo-600 rounded-full"></div> 공식 출석 TOP 5
+                    </div>
+                    <ul id="attr-rank-list" class="space-y-3.5"></ul>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- 사용자 상세 View -->
+    <main id="user-view" class="hidden px-5 flex-col space-y-6">
+        <nav class="flex items-center justify-between py-4">
+            <button onclick="goBack()" class="p-2 -ml-2 text-slate-900 bg-white rounded-xl shadow-sm border border-slate-100">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" /></svg>
+            </button>
+            <div class="text-center flex flex-col items-center">
+                <span id="current-user-name" class="text-2xl font-black text-slate-900">이름</span>
+                <span id="user-view-month-stats" class="text-[11px] font-extrabold text-blue-600 mt-1 bg-blue-50 px-3 py-0.5 rounded-full tracking-tight">0.0KM / 0회 출석</span>
+            </div>
+            <div class="w-10"></div>
+        </nav>
+
+        <div class="bg-white rounded-[36px] shadow-xl shadow-slate-200/40 border border-slate-50 p-6">
+            <div class="flex items-center justify-between mb-8 px-2">
+                <button onclick="changeMonth(-1)" class="p-2.5 text-slate-400 bg-slate-50 rounded-full"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" /></svg></button>
+                <span id="calendar-title" class="text-lg font-black text-slate-900">2026년 1월</span>
+                <button onclick="changeMonth(1)" class="p-2.5 text-slate-400 bg-slate-50 rounded-full"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" /></svg></button>
+            </div>
+            <div class="calendar-grid mb-4">
+                <div class="text-center text-[10px] text-red-400 font-black">Sun</div>
+                <div class="text-center text-[10px] text-slate-300 font-black">Mon</div>
+                <div class="text-center text-[10px] text-slate-300 font-black">Tue</div>
+                <div class="text-center text-[10px] text-blue-400 font-black">Wed</div>
+                <div class="text-center text-[10px] text-slate-300 font-black">Thu</div>
+                <div class="text-center text-[10px] text-slate-300 font-black">Fri</div>
+                <div class="text-center text-[10px] text-slate-300 font-black">Sat</div>
+            </div>
+            <div id="calendar-days" class="calendar-grid"></div>
+        </div>
+    </main>
+
+    <!-- 입력 모달 -->
+    <div id="input-modal" class="fixed inset-0 bg-slate-900/60 z-[150] hidden flex items-end justify-center backdrop-blur-[2px]">
+        <div class="bg-white w-full max-w-md rounded-t-[44px] p-8 pb-14 space-y-8 shadow-2xl modal-up">
+            <div class="flex justify-between items-start">
+                <div>
+                    <h3 id="modal-date-label" class="text-2xl font-black text-slate-900">1월 1일</h3>
+                    <p class="text-xs text-slate-400 font-bold uppercase mt-1">Daily Log</p>
+                </div>
+                <button onclick="closeModal()" class="p-2 bg-slate-100 rounded-full text-slate-400">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+            </div>
+            <div class="space-y-6">
+                <div class="relative group">
+                    <label class="block text-[11px] font-black text-slate-400 mb-2 uppercase ml-1">러닝 거리 (KM)</label>
+                    <input type="number" id="input-dist" step="0.1" inputmode="decimal" class="w-full bg-slate-50 border-2 border-transparent focus:border-blue-200 focus:bg-white rounded-2xl px-6 py-6 text-4xl font-black text-blue-600 outline-none" placeholder="0.0">
+                    <span class="absolute right-6 bottom-6 text-slate-300 font-black text-xl">KM</span>
+                </div>
+                <div id="attendance-section">
+                    <label class="flex items-center justify-between bg-blue-50/50 border-2 border-blue-100/30 p-5 rounded-2xl cursor-pointer">
+                        <div class="flex items-center gap-4">
+                            <div class="bg-blue-600 p-2.5 rounded-xl text-white shadow-lg shadow-blue-200">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>
+                            </div>
+                            <div>
+                                <span class="block text-sm font-black text-blue-900">공식 출석 체크</span>
+                                <span class="block text-[10px] text-blue-500 font-bold mt-0.5">인증 완료 시 체크</span>
+                            </div>
+                        </div>
+                        <input type="checkbox" id="input-attended" class="w-6 h-6 rounded-lg accent-blue-600 transform scale-125">
+                    </label>
+                </div>
+            </div>
+            <button onclick="saveRecord()" id="save-btn" class="w-full py-5 bg-blue-600 text-white rounded-2xl font-black text-lg shadow-xl shadow-blue-200 active:scale-[0.98] transition-all disabled:bg-slate-300 disabled:shadow-none">
+                기록 완료하기
+            </button>
+        </div>
+    </div>
+
+    <!-- 관리자 비밀번호 모달 -->
+    <div id="password-modal" class="fixed inset-0 bg-slate-900/90 z-[160] hidden flex items-center justify-center p-8 backdrop-blur-md">
+        <div class="bg-white w-full max-w-[320px] rounded-[44px] p-10 space-y-6 shadow-2xl text-center">
+            <h3 class="text-xl font-black text-slate-900">ADMIN KEY</h3>
+            <input type="password" id="admin-pw-input" inputmode="numeric" maxlength="4" class="w-full bg-slate-50 rounded-2xl text-center py-6 text-4xl font-black tracking-[0.4em] outline-none" placeholder="****">
+            <div class="flex gap-2.5">
+                <button onclick="closePwModal()" class="flex-1 py-4 bg-slate-100 text-slate-400 rounded-2xl font-bold">취소</button>
+                <button onclick="verifyPassword()" class="flex-1 py-4 bg-slate-900 text-white rounded-2xl font-bold">확인</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 관리자 View -->
+    <div id="admin-view" class="fixed inset-0 bg-slate-50 z-[200] hidden flex flex-col">
+        <header class="bg-white px-6 py-8 flex justify-between items-center shadow-sm">
+            <h2 class="text-2xl font-black tracking-tighter">관리 설정</h2>
+            <button onclick="closeAdminView()" class="p-2 bg-slate-100 rounded-full text-slate-400"><svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" /></svg></button>
+        </header>
+        <div class="p-6 space-y-10 overflow-y-auto flex-1">
+             <section class="space-y-4">
+                <label class="text-[11px] font-black text-slate-400 uppercase ml-1">Focus Month</label>
+                <select id="admin-month-select" onchange="setSystemMonth(this.value)" class="w-full bg-white border-none shadow-sm p-5 rounded-2xl text-sm font-black appearance-none">
+                    <option value="2026-01">2026년 1월</option>
+                    <option value="2026-02">2026년 2월</option>
+                    <option value="2026-03">2026년 3월</option>
+                    <option value="2026-04">2026년 4월</option>
+                    <option value="2026-05">2026년 5월</option>
+                    <option value="2026-06">2026년 6월</option>
+                    <option value="2026-07">2026년 7월</option>
+                </select>
+            </section>
+            <section class="space-y-4">
+                <label class="text-[11px] font-black text-slate-400 uppercase ml-1">Member List</label>
+                <div class="flex gap-2">
+                    <input type="text" id="new-name-input" class="flex-1 bg-white border-none shadow-sm p-4 rounded-2xl text-sm font-bold" placeholder="이름 추가">
+                    <button onclick="addNewMember()" class="bg-blue-600 text-white px-8 rounded-2xl font-black text-sm">추가</button>
+                </div>
+                <div id="admin-member-list" class="grid grid-cols-2 gap-3 mt-4"></div>
+            </section>
+        </div>
+    </div>
+</div>
+
+<script>
+    let firebaseConfig;
+    try {
+        firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
             apiKey: "AIzaSyBBP8vP90bOisbNlDpsp64k3hxLZw7x2JE",
             authDomain: "attendnew-63c66.firebaseapp.com",
             projectId: "attendnew-63c66",
@@ -67,91 +228,342 @@
             messagingSenderId: "992717620682",
             appId: "1:992717620682:web:5ee93256b2a5172d72fb33"
         };
+    } catch(e) {
+        console.warn("Using fallback config");
+    }
 
-        // 안전한 Config 가져오기 (배포 환경 호환)
-        let firebaseConfig;
+    const appId = typeof __app_id !== 'undefined' ? __app_id : "srt-d-team-v2";
+    let db, auth;
+    let members = [];
+    let selectedUser = null;
+    let currentViewMonth = "2026-01";
+    let systemMonth = "2026-01";
+    let allRecords = [];
+    let selectedDate = null;
+
+    async function init() {
         try {
-            // Canvas 환경 변수가 있는지 체크
-            const envConfig = typeof __firebase_config !== 'undefined' ? __firebase_config : null;
-            firebaseConfig = envConfig ? JSON.parse(envConfig) : myFirebaseConfig;
-        } catch (e) {
-            firebaseConfig = myFirebaseConfig;
+            if (!firebase.apps.length) {
+                firebase.initializeApp(firebaseConfig);
+            }
+            db = firebase.firestore();
+            auth = firebase.auth();
+            
+            await handleAuthentication();
+            setupListeners();
+        } catch (e) { 
+            console.error("Initialization Failed:", e);
+            setupListeners();
+            hideLoader();
         }
+    }
 
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'srt-d-group-v1';
-
-        // 상태 및 초기 데이터
-        let state = {
-            user: null,
-            members: [],
-            logs: {},
-            config: { currentMonth: new Date().toISOString().slice(0, 7) },
-            currentView: 'home',
-            searchTerm: '',
-            viewMonth: new Date().toISOString().slice(0, 7)
-        };
-
-        // 초기 인증
-        const initAuth = async () => {
+    async function handleAuthentication() {
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
             try {
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
-                }
-            } catch (error) {
-                console.error("Auth error:", error);
-                document.getElementById('loading-text').innerHTML = "인증 실패: Firebase 설정을 확인하세요.";
+                await auth.signInWithCustomToken(__initial_auth_token);
+                return;
+            } catch (e) {
+                console.warn("Auth Token Mismatch");
             }
-        };
+        }
+        try {
+            await auth.signInAnonymously();
+        } catch (e) {
+            if (e.code === 'auth/admin-restricted-operation') {
+                document.getElementById('auth-error-box').classList.remove('hidden');
+            }
+        }
+    }
 
-        onAuthStateChanged(auth, (user) => {
-            if (user) {
-                state.user = user;
-                initDataSync();
+    function hideLoader() {
+        const loader = document.getElementById('loading');
+        if(loader) {
+            loader.classList.add('opacity-0');
+            setTimeout(() => loader.style.display = 'none', 500);
+        }
+    }
+
+    function setupListeners() {
+        const dataDocRef = db.collection('artifacts').doc(appId).collection('public').doc('data');
+        
+        dataDocRef.collection('config').doc('settings').onSnapshot((doc) => {
+            if (doc.exists) {
+                const data = doc.data();
+                systemMonth = data.systemMonth || "2026-01";
+                members = data.members || [];
+                document.getElementById('admin-month-select').value = systemMonth;
+                document.getElementById('rank-month-label').textContent = `${parseInt(systemMonth.split('-')[1])}월`;
+                document.getElementById('member-count-badge').textContent = `${members.length}명`;
+                renderNameGrid();
+                renderAdminMemberList();
+                renderRankings();
+                hideLoader();
+            } else {
+                createInitialData(dataDocRef);
             }
+        }, (err) => {
+            console.error("Settings listener error:", err);
+            hideLoader();
         });
 
-        function initDataSync() {
-            if (!state.user) return;
-            const membersColl = collection(db, 'artifacts', appId, 'public', 'data', 'members');
-            const logsColl = collection(db, 'artifacts', appId, 'public', 'data', 'logs');
-            
-            onSnapshot(membersColl, (snap) => {
-                state.members = snap.docs.map(d => d.data());
-                render();
-                document.getElementById('loading-screen').classList.add('hidden');
-            }, (err) => {
-                document.getElementById('loading-text').innerText = "데이터 로드 권한 오류 (Rules 확인)";
-            });
-
-            onSnapshot(logsColl, (snap) => {
-                snap.forEach(d => state.logs[d.id] = d.data());
-                render();
-            });
-        }
-
-        // 라우팅 및 렌더링 (축약)
-        window.router = { go: (v) => { state.currentView = v; render(); } };
-        window.admin = {
-            showModal: () => document.getElementById('admin-modal').classList.remove('hidden'),
-            hideModal: () => document.getElementById('admin-modal').classList.add('hidden'),
-            verify: () => {
-                if(document.getElementById('admin-password-input').value === '1004') router.go('admin');
-                admin.hideModal();
+        dataDocRef.collection('records').onSnapshot((snapshot) => {
+            allRecords = snapshot.docs.map(doc => doc.data());
+            renderNameGrid();
+            renderRankings();
+            if (selectedUser) {
+                renderCalendar();
+                updatePersonalHeaderStats();
             }
-        };
+        }, (err) => {
+            console.error("Records listener error:", err);
+        });
+    }
 
-        function render() {
-            const main = document.getElementById('main-content');
-            main.innerHTML = `<div class="p-8 text-center text-slate-400 font-bold">시스템 작동 중...<br>${state.members.length}명의 멤버 로드됨</div>`;
-            lucide.createIcons();
+    async function createInitialData(dataDocRef) {
+        const defaultMembers = ["강동현", "강동훈", "송채한", "김미화", "김재산", "김찬석", "김한나", "류지찬", "박성환", "박종봉", "소병득", "서정화", "신영섭", "안지훈", "오한천", "이승준", "이용구", "정덕수", "주효석", "서인수", "박창선", "김병식"];
+        try {
+            await dataDocRef.collection('config').doc('settings').set({ systemMonth: "2026-01", members: defaultMembers });
+        } catch (e) {
+            console.error("Initial data creation failed:", e);
         }
+    }
 
-        initAuth();
-    </script>
+    function renderNameGrid() {
+        const grid = document.getElementById('name-grid');
+        if (!members || members.length === 0) {
+            grid.innerHTML = '<div class="col-span-4 py-10 text-center text-slate-300 text-xs font-bold italic">멤버 데이터가 없습니다.</div>';
+            return;
+        }
+        grid.innerHTML = [...members].sort().map(name => {
+            const stats = getMemberStats(name);
+            return `<button onclick="selectUser('${name}')" class="name-card p-3 rounded-2xl text-center">
+                <div class="text-[13px] font-black text-slate-800 mb-0.5">${name}</div>
+                <div class="text-[8px] font-black text-blue-500 uppercase">${stats.dist}k / ${stats.attr}회</div>
+            </button>`;
+        }).join('');
+    }
+
+    function getMemberStats(name) {
+        const filtered = allRecords.filter(r => r.user === name && r.date.startsWith(systemMonth));
+        let dist = 0, attr = 0;
+        filtered.forEach(r => {
+            dist += parseFloat(r.dist || 0);
+            const day = new Date(r.date).getDay();
+            if ((day === 0 || day === 3) && r.attended) attr += 1;
+        });
+        return { dist: dist.toFixed(1), attr };
+    }
+
+    function renderRankings() {
+        const stats = {};
+        members.forEach(m => stats[m] = { dist: 0, count: 0 });
+        allRecords.filter(r => r.date.startsWith(systemMonth)).forEach(r => {
+            if (stats[r.user]) {
+                stats[r.user].dist += parseFloat(r.dist || 0);
+                const day = new Date(r.date).getDay();
+                if ((day === 0 || day === 3) && r.attended) stats[r.user].count += 1;
+            }
+        });
+        const distRank = Object.entries(stats).filter(s => s[1].dist > 0).sort((a, b) => b[1].dist - a[1].dist).slice(0, 5);
+        const attrRank = Object.entries(stats).filter(s => s[1].count > 0).sort((a, b) => b[1].count - a[1].count).slice(0, 5);
+        
+        document.getElementById('dist-rank-list').innerHTML = distRank.map(([name, s], i) => `
+            <li class="flex justify-between items-center bg-slate-50 p-3.5 rounded-2xl">
+                <span class="text-xs font-extrabold text-slate-700">#${i+1} ${name}</span>
+                <span class="text-xs font-black text-slate-900">${s.dist.toFixed(1)} KM</span>
+            </li>`).join('') || '<li class="text-[10px] text-center text-slate-300 py-2">기록 없음</li>';
+
+        document.getElementById('attr-rank-list').innerHTML = attrRank.map(([name, s], i) => `
+            <li class="flex justify-between items-center bg-slate-50 p-3.5 rounded-2xl">
+                <span class="text-xs font-extrabold text-slate-700">#${i+1} ${name}</span>
+                <span class="text-xs font-black text-slate-900">${s.count} 회</span>
+            </li>`).join('') || '<li class="text-[10px] text-center text-slate-300 py-2">기록 없음</li>';
+    }
+
+    async function saveRecord() {
+        if (!auth.currentUser) return alert("저장 권한이 없습니다.");
+        const distInput = document.getElementById('input-dist');
+        const attended = document.getElementById('input-attended').checked;
+        const dist = parseFloat(distInput.value || 0);
+        const id = `${selectedUser}_${selectedDate}`;
+        const btn = document.getElementById('save-btn');
+        btn.disabled = true;
+        try {
+            await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('records').doc(id).set({
+                user: selectedUser, date: selectedDate, dist: dist, attended: attended, updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            closeModal();
+        } catch (e) { alert("저장 실패"); } finally { btn.disabled = false; }
+    }
+
+    function selectUser(name) {
+        selectedUser = name; 
+        currentViewMonth = systemMonth;
+        document.getElementById('current-user-name').textContent = name;
+        updatePersonalHeaderStats();
+        document.getElementById('main-view').classList.add('hidden');
+        document.getElementById('user-view').classList.remove('hidden');
+        document.getElementById('user-view').classList.add('flex');
+        renderCalendar();
+    }
+
+    function updatePersonalHeaderStats() {
+        const stats = getMemberStats(selectedUser);
+        document.getElementById('user-view-month-stats').textContent = `${stats.dist}KM / ${stats.attr}회 출석`;
+    }
+
+    function goBack() {
+        selectedUser = null;
+        document.getElementById('main-view').classList.remove('hidden');
+        document.getElementById('user-view').classList.add('hidden');
+    }
+
+    function renderCalendar() {
+        const [year, month] = currentViewMonth.split('-').map(Number);
+        document.getElementById('calendar-title').textContent = `${year}년 ${month}월`;
+        const firstDay = new Date(year, month - 1, 1).getDay();
+        const daysInMonth = new Date(year, month, 0).getDate();
+        const container = document.getElementById('calendar-days');
+        container.innerHTML = '';
+        for (let i = 0; i < firstDay; i++) container.innerHTML += `<div></div>`;
+        for (let d = 1; d <= daysInMonth; d++) {
+            const dateStr = `${year}-${month.toString().padStart(2, '0')}-${d.toString().padStart(2, '0')}`;
+            const dayOfWeek = new Date(year, month - 1, d).getDay();
+            const isOfficial = (dayOfWeek === 0 || dayOfWeek === 3);
+            const record = allRecords.find(r => r.user === selectedUser && r.date === dateStr);
+            const cell = document.createElement('div');
+            cell.className = `day-cell ${isOfficial ? 'official-day' : ''} ${record && (record.dist > 0 || record.attended) ? 'has-record' : ''}`;
+            cell.innerHTML = `<span class="font-black">${d}</span>${record && record.dist > 0 ? `<span class="text-[8px] mt-0.5 font-black opacity-80">${record.dist}</span>` : ''}`;
+            cell.onclick = () => openInputModal(dateStr, record);
+            container.appendChild(cell);
+        }
+    }
+
+    function openInputModal(date, record) {
+        selectedDate = date;
+        const [y, m, d] = date.split('-');
+        const dayOfWeek = new Date(y, m - 1, d).getDay();
+        const isOfficial = (dayOfWeek === 0 || dayOfWeek === 3);
+        
+        document.getElementById('modal-date-label').textContent = `${parseInt(m)}월 ${parseInt(d)}일`;
+        document.getElementById('input-dist').value = record ? record.dist : "";
+        document.getElementById('input-attended').checked = record ? record.attended : false;
+        
+        const attendanceSection = document.getElementById('attendance-section');
+        if (isOfficial) {
+            attendanceSection.classList.remove('hidden');
+        } else {
+            attendanceSection.classList.add('hidden');
+            document.getElementById('input-attended').checked = false;
+        }
+        
+        document.getElementById('input-modal').classList.remove('hidden');
+        document.body.classList.add('no-scroll');
+    }
+
+    function closeModal() {
+        document.getElementById('input-modal').classList.add('hidden');
+        document.body.classList.remove('no-scroll');
+    }
+
+    // 관리자 관련 함수
+    function askAdminPassword() { 
+        resetAdminPw(); // 호출 시마다 입력창 리셋
+        document.getElementById('password-modal').classList.remove('hidden'); 
+    }
+
+    function closePwModal() { 
+        resetAdminPw(); // 취소 시 리셋
+        document.getElementById('password-modal').classList.add('hidden'); 
+    }
+
+    function resetAdminPw() {
+        const pwInput = document.getElementById('admin-pw-input');
+        if(pwInput) pwInput.value = "";
+    }
+
+    function verifyPassword() {
+        const pwInput = document.getElementById('admin-pw-input');
+        if (pwInput.value === '1004') {
+            pwInput.value = ""; // 인증 성공 직후 리셋
+            document.getElementById('password-modal').classList.add('hidden'); 
+            document.getElementById('admin-view').classList.remove('hidden'); 
+        } else { 
+            alert("비밀번호 오류"); 
+            resetAdminPw(); // 틀렸을 때도 리셋
+        }
+    }
+
+    function closeAdminView() { 
+        resetAdminPw(); // 관리자 뷰 종료 시에도 리셋 (혹시 모를 상태 대비)
+        document.getElementById('admin-view').classList.add('hidden'); 
+    }
+
+    function changeMonth(d) {
+        const [y, m] = currentViewMonth.split('-').map(Number);
+        let date = new Date(y, m - 1 + d, 1);
+        currentViewMonth = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
+        renderCalendar();
+    }
+    
+    function renderAdminMemberList() {
+        document.getElementById('admin-member-list').innerHTML = [...members].sort().map(name => `
+            <div class="flex justify-between items-center p-4 bg-white shadow-sm rounded-2xl text-[13px] font-black group">
+                <span class="text-slate-700">${name}</span>
+                <button onclick="removeMember('${name}')" class="text-red-400 hover:text-red-600 font-bold p-1 transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                </button>
+            </div>`).join('');
+    }
+
+    async function setSystemMonth(v) {
+        if (!auth.currentUser) return;
+        try {
+            await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('config').doc('settings').update({ systemMonth: v });
+        } catch(e) {
+            console.error("Month update failed", e);
+        }
+    }
+
+    async function addNewMember() {
+        if (!auth.currentUser) return;
+        const input = document.getElementById('new-name-input');
+        const name = input.value.trim();
+        if (name && !members.includes(name)) {
+            try {
+                await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('config').doc('settings').update({ 
+                    members: firebase.firestore.FieldValue.arrayUnion(name)
+                });
+                input.value = "";
+            } catch(e) {
+                console.error("Add member failed", e);
+                alert("멤버 추가 실패");
+            }
+        }
+    }
+
+    async function removeMember(n) {
+        if (!auth.currentUser) return;
+        if(confirm(`${n}님을 멤버 목록에서 삭제하시겠습니까?`)) {
+            try {
+                const settingsRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('config').doc('settings');
+                await settingsRef.update({ 
+                    members: firebase.firestore.FieldValue.arrayRemove(n)
+                });
+                members = members.filter(m => m !== n);
+                renderAdminMemberList();
+                renderNameGrid();
+            } catch(e) {
+                console.error("Remove member failed", e);
+                alert("삭제 중 오류가 발생했습니다.");
+            }
+        }
+    }
+
+    window.onload = init;
+</script>
 </body>
 </html>
